@@ -1,0 +1,63 @@
+:root {
+  /* --- Cozy "golden hour" palette ---
+     Named tokens instead of ad-hoc hex so the HUD and the fog/lighting
+     in world.js pull from the same warm, low-saturation family. */
+  --cozy-cream: #fbf0dd;      /* warm parchment — primary HUD text on glass */
+  --cozy-ink: #3a2b22;        /* warm dark brown — high-contrast text/icons */
+  --cozy-amber: #e8a33d;      /* sun accent — primary actions, focus rings */
+  --cozy-moss: #6b8f71;       /* sage accent — secondary/idle states */
+  --cozy-clay: #c97b63;       /* muted clay-rose — used sparingly, notifications */
+  --cozy-glass: rgba(41, 30, 23, 0.42);
+  --cozy-glass-border: rgba(251, 240, 221, 0.16);
+
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-body: 'Nunito Sans', ui-rounded, 'Segoe UI', sans-serif;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #1c140f;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+canvas.experience-canvas {
+  position: fixed;
+  inset: 0;
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+/* Visible keyboard focus everywhere in the HUD — required for accessibility
+   even in a game shell, since buttons remain reachable by Tab. */
+:focus-visible {
+  outline: 2px solid var(--cozy-amber);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
