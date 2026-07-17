@@ -42,11 +42,10 @@ export function buildWorld(scene) {
   groundMesh.position.y = -0.5;
   groundMesh.receiveShadow = true;
   group.add(groundMesh);
-  collidableGeometries.push(prepForMerge(groundGeo, groundMesh));
 
   // A slightly raised inner disc breaks up the flat green with a two-tone
   // "clearing" look, which is a big part of the low-poly cozy read.
-  const clearingGeo = new THREE.CylinderGeometry(18, 19.2, 0.15, 7, 1);
+  const clearingGeo = new THREE.CylinderGeometry(18, 19.2, 0.01, 7, 1);
   const clearingMesh = new THREE.Mesh(
     clearingGeo,
     new THREE.MeshStandardMaterial({
@@ -55,11 +54,10 @@ export function buildWorld(scene) {
       roughness: 1
     })
   );
-  clearingMesh.position.y = 0.075;
+  clearingMesh.position.y = -0.004; // Top face at y=0.001 to prevent z-fighting with ground
   clearingMesh.receiveShadow = true;
   clearingMesh.castShadow = false;
   group.add(clearingMesh);
-  collidableGeometries.push(prepForMerge(clearingGeo, clearingMesh));
 
   // --- Obstacles: crates, walls, and rock clusters scattered across 2x larger map --
   const obstacleDefs = [

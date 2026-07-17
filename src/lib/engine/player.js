@@ -381,14 +381,20 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
     _deltaVector.normalize().multiplyScalar(offset);
     mesh.position.add(_deltaVector);
 
-    player.isGrounded = _deltaVector.y > Math.abs(deltaTime * velocity.y * 0.25);
-
-    if (player.isGrounded) {
-      velocity.y = 0;
-    } else if (offset > 0) {
+    if (offset > 0) {
       _deltaVector.normalize();
       velocity.addScaledVector(_deltaVector, -_deltaVector.dot(velocity));
     }
+  }
+
+  // --- Absolute Floor Constraint ---
+  // The capsule bottom is at mesh.position.y - 0.8. We enforce a mathematical floor at y = 0.0.
+  if (mesh.position.y <= 0.8) {
+    mesh.position.y = 0.8;
+    velocity.y = 0;
+    player.isGrounded = true;
+  } else {
+    player.isGrounded = false;
   }
 
   // --- 5. Fallback safety net ------------------------------------------------
