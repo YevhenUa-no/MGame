@@ -34,12 +34,16 @@ export function createTouchControls(inputState) {
         <div class="joystick-knob"></div>
       </div>
     </div>
+    <div class="touch-action-buttons">
+      <button type="button" class="touch-btn run-btn" aria-label="Hold to run">RUN</button>
+    </div>
   `;
   document.body.appendChild(root);
 
   const zone = root.querySelector('.joystick-zone');
   const base = root.querySelector('.joystick-base');
   const knob = root.querySelector('.joystick-knob');
+  const runBtn = root.querySelector('.run-btn');
 
   let activeTouchId = null;
   let originX = 0;
@@ -112,8 +116,24 @@ export function createTouchControls(inputState) {
   zone.addEventListener('touchend', onTouchEnd, { passive: true });
   zone.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
+  function bindHoldButton(button, key) {
+    const press = (event) => {
+      event.preventDefault();
+      inputState[key] = true;
+    };
+    const release = () => {
+      inputState[key] = false;
+    };
+    button.addEventListener('touchstart', press, { passive: false });
+    button.addEventListener('touchend', release, { passive: true });
+    button.addEventListener('touchcancel', release, { passive: true });
+  }
+
+  bindHoldButton(runBtn, 'run');
+
   function dispose() {
     resetJoystick();
+    inputState.run = false;
     root.remove();
   }
 

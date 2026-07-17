@@ -4,6 +4,7 @@ const GRAVITY = -28;
 const MOVE_ACCEL = 55;
 const MOVE_DAMPING = 10;
 const WALK_SPEED = 4.4;
+const RUN_SPEED = 7.2;
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
 // inside the animation loop is one of the most common sources of GC
@@ -237,53 +238,33 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed) {
   const time = mesh.userData.animationTime;
   const t = 1 - Math.exp(-12 * deltaTime);
 
-  if (horizontalSpeed > 0.1) {
-    leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
-    leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
-    rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
-    rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
-    leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
-    rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
+  // Keep limbs static (flying style)
+  leftLegPivot.rotation.x += (0 - leftLegPivot.rotation.x) * t;
+  leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
+  leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
+  rightLegPivot.rotation.x += (0 - rightLegPivot.rotation.x) * t;
+  rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
+  rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
 
-    const frequency = 10;
-    const amplitude = 0.45;
+  leftArmPivot.rotation.x += (0 - leftArmPivot.rotation.x) * t;
+  leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
+  leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
 
-    leftLegPivot.rotation.x = Math.sin(time * frequency) * amplitude;
-    rightLegPivot.rotation.x = -Math.sin(time * frequency) * amplitude;
-    leftArmPivot.rotation.x = -Math.sin(time * frequency) * amplitude * 1.1;
-    rightArmPivot.rotation.x = Math.sin(time * frequency) * amplitude * 1.1;
+  rightArmPivot.rotation.x += (0 - rightArmPivot.rotation.x) * t;
+  rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
+  rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
 
-    leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
-    rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
+  // Gentle floating/hover bobbing
+  const bobFreq = horizontalSpeed > 0.1 ? 3.5 : 2.0;
+  const bobAmp = horizontalSpeed > 0.1 ? 0.04 : 0.025;
+  const bob = Math.sin(time * bobFreq) * bobAmp;
+  pivot.position.y += (-0.05 + bob - pivot.position.y) * t;
 
-    const bob = Math.abs(Math.sin(time * frequency)) * 0.04;
-    pivot.position.y += (-0.05 + bob - pivot.position.y) * t;
+  // Lean forward slightly when moving (flying look)
+  const targetLean = horizontalSpeed > 0.1 ? 0.12 : 0;
+  pivot.rotation.x += (targetLean - pivot.rotation.x) * t;
 
-    const lean = 0.08;
-    pivot.rotation.x += (lean - pivot.rotation.x) * t;
-
-    head.position.y = 0.28 + Math.cos(time * frequency) * 0.012;
-  } else {
-    leftLegPivot.rotation.x += (0 - leftLegPivot.rotation.x) * t;
-    leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
-    leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
-    rightLegPivot.rotation.x += (0 - rightLegPivot.rotation.x) * t;
-    rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
-    rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
-
-    leftArmPivot.rotation.x += (0 - leftArmPivot.rotation.x) * t;
-    leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
-    leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
-    
-    rightArmPivot.rotation.x += (0 - rightArmPivot.rotation.x) * t;
-    rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
-    rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
-
-    const breathe = Math.sin(time * 2.5) * 0.015;
-    pivot.position.y += (-0.05 + breathe - pivot.position.y) * t;
-    pivot.rotation.x += (0 - pivot.rotation.x) * t;
-    head.position.y = 0.28 + Math.sin(time * 2.5) * 0.006;
-  }
+  head.position.y = 0.28 + Math.sin(time * bobFreq) * 0.008;
 }
 
 export function createPlayer(scene) {
@@ -346,7 +327,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       .addScaledVector(_forward, _moveInput.z)
       .normalize();
 
-    const targetSpeed = WALK_SPEED * inputMagnitude;
+    const targetSpeed = (input.run ? RUN_SPEED : WALK_SPEED) * inputMagnitude;
     velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, MOVE_ACCEL * deltaTime);
     velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, MOVE_ACCEL * deltaTime);
 
@@ -385,21 +366,22 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
           const normal = _deltaVector;
           tri.getNormal(normal);
           
-          const diff = _moveInput;
-          diff.subVectors(_tempVector, _tempVector2);
+          // Vector from triangle closest point to segment midpoint
+          const toCapsule = _forward;
+          toCapsule.addVectors(_tempSegment.start, _tempSegment.end).multiplyScalar(0.5).sub(_tempVector2);
           
-          const d = diff.dot(normal);
-          if (d < capsuleInfo.radius) {
-            const depth = capsuleInfo.radius - d;
-            
-            const direction = normal;
-            if (d > 1e-3) {
-              direction.copy(diff).normalize();
-            }
-            
-            _tempSegment.start.addScaledVector(direction, depth);
-            _tempSegment.end.addScaledVector(direction, depth);
+          if (normal.dot(toCapsule) < 0) {
+            normal.negate();
           }
+          
+          const direction = normal;
+          if (distance > 1e-4) {
+            direction.subVectors(_tempVector, _tempVector2).normalize();
+          }
+          
+          const depth = capsuleInfo.radius - distance;
+          _tempSegment.start.addScaledVector(direction, depth);
+          _tempSegment.end.addScaledVector(direction, depth);
         }
       }
     });
