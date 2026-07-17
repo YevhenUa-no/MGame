@@ -445,11 +445,24 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       intersectsTriangle: (tri) => {
         const distance = tri.closestPointToSegment(_tempSegment, _tempVector, _tempVector2);
         if (distance < capsuleInfo.radius) {
-          const depth = capsuleInfo.radius - distance;
-          // Pushes the capsule OUT of the triangle (from _tempVector2 on tri to _tempVector on segment)
-          const direction = _tempVector.sub(_tempVector2).normalize();
-          _tempSegment.start.addScaledVector(direction, depth);
-          _tempSegment.end.addScaledVector(direction, depth);
+          const normal = _deltaVector;
+          tri.getNormal(normal);
+          
+          const diff = _moveInput;
+          diff.subVectors(_tempVector, _tempVector2);
+          
+          const d = diff.dot(normal);
+          if (d < capsuleInfo.radius) {
+            const depth = capsuleInfo.radius - d;
+            
+            const direction = normal;
+            if (d > 1e-3) {
+              direction.copy(diff).normalize();
+            }
+            
+            _tempSegment.start.addScaledVector(direction, depth);
+            _tempSegment.end.addScaledVector(direction, depth);
+          }
         }
       }
     });
