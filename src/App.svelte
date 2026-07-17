@@ -24,7 +24,7 @@
 <canvas class="experience-canvas" bind:this={canvasEl}></canvas>
 
 {#if ready}
-  <Overlay onEmoji={experience.sendEmoji} />
+  <Overlay onEmoji={experience.sendEmoji} onSit={(sitting) => experience.toggleSit(sitting)} />
 {/if}
 
 <style>

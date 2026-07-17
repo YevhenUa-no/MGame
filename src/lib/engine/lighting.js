@@ -31,13 +31,13 @@ export function buildLighting(scene) {
   // Tightly fit the orthographic shadow frustum to the playable area
   // (the world in world.js is an 18-unit-radius disc). A frustum that's
   // much bigger than the scene wastes shadow map texels on empty sky.
-  const shadowExtent = 20;
+  const shadowExtent = 40;
   sun.shadow.camera.left = -shadowExtent;
   sun.shadow.camera.right = shadowExtent;
   sun.shadow.camera.top = shadowExtent;
   sun.shadow.camera.bottom = -shadowExtent;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 45;
+  sun.shadow.camera.far = 90;
 
   // A touch of bias + normal bias avoids both shadow acne and peter-panning
   // on the low-poly obstacle geometry.
@@ -49,8 +49,8 @@ export function buildLighting(scene) {
   sun.shadow.radius = 4;
 
   // Warm, pale fog matches the ambient tint and hides the level's hard
-  // edge (the 18-unit ground disc) in a soft haze instead of a visible pop.
-  scene.fog = new THREE.Fog(0xf6e3c4, 22, 42);
+  // edge (the 36-unit ground disc) in a soft haze instead of a visible pop.
+  scene.fog = new THREE.Fog(0xf6e3c4, 44, 84);
   scene.background = new THREE.Color(0xf6e3c4);
 
   return { hemi, sun };

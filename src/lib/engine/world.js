@@ -30,7 +30,7 @@ export function buildWorld(scene) {
   const collidableGeometries = [];
 
   // --- Ground -------------------------------------------------------------
-  const groundGeo = new THREE.CylinderGeometry(18, 18, 1, 8, 1);
+  const groundGeo = new THREE.CylinderGeometry(36, 36, 1, 8, 1);
   const groundMesh = new THREE.Mesh(
     groundGeo,
     new THREE.MeshStandardMaterial({
@@ -46,7 +46,7 @@ export function buildWorld(scene) {
 
   // A slightly raised inner disc breaks up the flat green with a two-tone
   // "clearing" look, which is a big part of the low-poly cozy read.
-  const clearingGeo = new THREE.CylinderGeometry(9, 9.6, 0.15, 7, 1);
+  const clearingGeo = new THREE.CylinderGeometry(18, 19.2, 0.15, 7, 1);
   const clearingMesh = new THREE.Mesh(
     clearingGeo,
     new THREE.MeshStandardMaterial({
@@ -61,16 +61,26 @@ export function buildWorld(scene) {
   group.add(clearingMesh);
   collidableGeometries.push(prepForMerge(clearingGeo, clearingMesh));
 
-  // --- Obstacles: crates, a low wall ring, and a couple of rock clusters --
+  // --- Obstacles: crates, walls, and rock clusters scattered across 2x larger map --
   const obstacleDefs = [
-    { type: 'crate', pos: [3, 0, -2], scale: 1 },
-    { type: 'crate', pos: [4.1, 0, -0.6], scale: 0.8 },
-    { type: 'crate', pos: [-4, 0, 3], scale: 1.2 },
-    { type: 'wall', pos: [-6, 0, -3], rot: 0.3, length: 5 },
-    { type: 'wall', pos: [6, 0, 2], rot: -0.5, length: 4 },
-    { type: 'rock', pos: [-2.5, 0, -5], scale: 1.4 },
-    { type: 'rock', pos: [1.5, 0, 6], scale: 1.1 },
-    { type: 'rock', pos: [-6.5, 0, 4.5], scale: 0.9 }
+    // Original scaled obstacles
+    { type: 'crate', pos: [6, 0, -4], scale: 1 },
+    { type: 'crate', pos: [8.2, 0, -1.2], scale: 0.8 },
+    { type: 'crate', pos: [-8, 0, 6], scale: 1.2 },
+    { type: 'wall', pos: [-12, 0, -6], rot: 0.3, length: 5 },
+    { type: 'wall', pos: [12, 0, 4], rot: -0.5, length: 4 },
+    { type: 'rock', pos: [-5, 0, -10], scale: 1.4 },
+    { type: 'rock', pos: [3, 0, 12], scale: 1.1 },
+    { type: 'rock', pos: [-13, 0, 9], scale: 0.9 },
+    // New obstacles to populate the expanded clearing
+    { type: 'crate', pos: [14, 0, -15], scale: 1.1 },
+    { type: 'crate', pos: [-16, 0, -12], scale: 0.9 },
+    { type: 'crate', pos: [18, 0, 8], scale: 1 },
+    { type: 'rock', pos: [22, 0, -16], scale: 1.5 },
+    { type: 'rock', pos: [-20, 0, 16], scale: 1.2 },
+    { type: 'rock', pos: [0, 0, -22], scale: 1.6 },
+    { type: 'wall', pos: [-18, 0, -2], rot: 0.9, length: 6 },
+    { type: 'wall', pos: [18, 0, -8], rot: -0.9, length: 5 }
   ];
 
   for (const def of obstacleDefs) {

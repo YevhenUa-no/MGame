@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { buildCharacterModel, animateAvatar } from './player.js';
 
 // Same critically-damped-feeling lerp used by cameraRig.js — remote
 // avatars arrive at ~15Hz over the network but should still look like they
@@ -20,14 +21,7 @@ export function createRemotePlayers(scene) {
   const players = new Map();
 
   function makeAvatar(color) {
-    const geometry = new THREE.CapsuleGeometry(0.35, 0.9, 6, 12);
-    const material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(color[0] / 255, color[1] / 255, color[2] / 255),
-      roughness: 0.6,
-      flatShading: true
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
+    const mesh = buildCharacterModel(color || [200, 200, 200]);
     return mesh;
   }
 
@@ -53,8 +47,13 @@ export function createRemotePlayers(scene) {
     if (!entry) return;
     clearEmoji(entry);
     group.remove(entry.mesh);
-    entry.mesh.geometry.dispose();
-    entry.mesh.material.dispose();
+    entry.mesh.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((m) => m.dispose());
+      }
+    });
     players.delete(id);
   }
 
@@ -94,6 +93,10 @@ export function createRemotePlayers(scene) {
   function update(deltaTime) {
     const t = 1 - Math.exp(-LERP_RATE * deltaTime);
     for (const { mesh, target } of players.values()) {
+      const prevX = mesh.position.x;
+      const prevY = mesh.position.y;
+      const prevZ = mesh.position.z;
+
       mesh.position.x += (target.x - mesh.position.x) * t;
       mesh.position.y += (target.y - mesh.position.y) * t;
       mesh.position.z += (target.z - mesh.position.z) * t;
@@ -101,6 +104,15 @@ export function createRemotePlayers(scene) {
       let delta = ((target.rotY - mesh.rotation.y + Math.PI) % (Math.PI * 2)) - Math.PI;
       if (delta < -Math.PI) delta += Math.PI * 2;
       mesh.rotation.y += delta * t;
+
+      const dx = mesh.position.x - prevX;
+      const dy = mesh.position.y - prevY;
+      const dz = mesh.position.z - prevZ;
+      const speed = Math.hypot(dx, dz) / (deltaTime || 0.016);
+      const verticalSpeed = Math.abs(dy) / (deltaTime || 0.016);
+      const isGrounded = verticalSpeed < 2.0;
+
+      animateAvatar(mesh, deltaTime, isGrounded, speed);
     }
   }
 

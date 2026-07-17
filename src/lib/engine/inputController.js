@@ -34,7 +34,7 @@ export function createInputController() {
 
   function recomputeMove() {
     const x = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-    const z = (keys.backward ? 1 : 0) - (keys.forward ? 1 : 0);
+    const z = (keys.forward ? 1 : 0) - (keys.backward ? 1 : 0);
     const len = Math.hypot(x, z);
     state.moveX = len > 0 ? x / len : 0;
     state.moveZ = len > 0 ? z / len : 0;

@@ -104,7 +104,7 @@ export function createTouchControls(inputState) {
     // WASD writes: dragging the knob up (toward the horizon) should move
     // the player forward, matching KeyW's moveZ = -1.
     inputState.moveX = dx / MAX_RADIUS;
-    inputState.moveZ = dy / MAX_RADIUS;
+    inputState.moveZ = -dy / MAX_RADIUS;
   }
 
   function onTouchEnd(event) {

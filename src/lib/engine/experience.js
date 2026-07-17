@@ -98,6 +98,10 @@ export function createExperience(canvas) {
     }
   }
 
+  function toggleSit(sitting) {
+    player.isSitting = sitting;
+  }
+
   function dispose() {
     stop();
     input.dispose();
@@ -115,5 +119,5 @@ export function createExperience(canvas) {
     });
   }
 
-  return { scene, camera, renderer, start, stop, dispose, sendEmoji: network.sendEmoji };
+  return { scene, camera, renderer, start, stop, dispose, sendEmoji: network.sendEmoji, toggleSit };
 }

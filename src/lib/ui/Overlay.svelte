@@ -2,10 +2,8 @@
   import { onMount } from 'svelte';
   import gsap from 'gsap';
 
-  // Called with the emoji's index into `emojis` whenever the local player
-  // fires one off — wired to experience.sendEmoji() by App.svelte so other
-  // players see it too. Defaults to a no-op so Overlay still works standalone.
   export let onEmoji = () => {};
+  export let onSit = () => {};
 
   let cornerEl;
   let arcEl;
@@ -14,15 +12,22 @@
 
   let chatOpen = false;
   let isTouch = false;
+  let isSitting = false;
   const emojis = ['👋', '🌿', '☀️', '🍃', '💤', '✨'];
+
+  function toggleSit() {
+    isSitting = !isSitting;
+    onSit(isSitting);
+  }
 
   onMount(() => {
     isTouch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
+    const handleStandUp = () => {
+      isSitting = false;
+    };
+    window.addEventListener('player-stand-up', handleStandUp);
 
-    // Entrance choreography: the title card drifts up+in first, then the
-    // action arc follows with a short overlap — a single orchestrated
-    // moment reads far better than every element fading in on its own.
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     tl.from(cornerEl, { y: -16, opacity: 0, duration: 0.7 })
       .from(
@@ -31,9 +36,11 @@
         '-=0.35'
       );
 
-    // Chat menu starts hidden but stays mounted (rather than #if-toggled)
-    // so we can tween it open/closed instead of hard-cutting visibility.
     gsap.set(chatMenuEl, { opacity: 0, scale: 0.85, transformOrigin: '50% 100%', pointerEvents: 'none' });
+
+    return () => {
+      window.removeEventListener('player-stand-up', handleStandUp);
+    };
   });
 
   function toggleChat() {
@@ -139,7 +146,15 @@
     <button class="action-btn primary" style="--i: 1" on:click={wave} aria-label="Wave">
       👋
     </button>
-    <button class="action-btn" style="--i: 2" aria-label="Sit down"> 🧘 </button>
+    <button
+      class="action-btn"
+      class:active={isSitting}
+      style="--i: 2"
+      on:click={toggleSit}
+      aria-label="Sit down"
+    >
+      {isSitting ? '✨' : '🧘'}
+    </button>
   </div>
 </div>
 
@@ -156,12 +171,13 @@
     top: clamp(16px, 3vw, 32px);
     left: clamp(16px, 3vw, 32px);
     max-width: 320px;
-    padding: 14px 18px;
-    border-radius: 16px;
-    background: var(--cozy-glass);
-    border: 1px solid var(--cozy-glass-border);
-    backdrop-filter: blur(10px);
+    padding: 16px 20px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(251, 240, 221, 0.12), rgba(41, 30, 23, 0.55));
+    border: 1px solid rgba(251, 240, 221, 0.25);
+    backdrop-filter: blur(12px);
     color: var(--cozy-cream);
+    box-shadow: 0 8px 32px rgba(28, 20, 15, 0.2);
   }
 
   .eyebrow {
@@ -218,30 +234,40 @@
   }
 
   .action-btn {
-    /* The --i custom property staggers each button upward along a shallow
-       arc: middle button highest, outer buttons lower — like a horizon. */
     --lift: calc(6px - (var(--i) - 1) * (var(--i) - 1) * 6px);
     transform: translateY(calc(-1 * var(--lift)));
 
     width: 52px;
     height: 52px;
     border-radius: 50%;
-    border: 1px solid var(--cozy-glass-border);
-    background: var(--cozy-glass);
-    backdrop-filter: blur(10px);
+    border: 1px solid rgba(251, 240, 221, 0.25);
+    background: linear-gradient(135deg, rgba(251, 240, 221, 0.12), rgba(41, 30, 23, 0.55));
+    backdrop-filter: blur(12px);
     font-size: 1.35rem;
     line-height: 1;
     cursor: pointer;
     display: grid;
     place-items: center;
     color: var(--cozy-cream);
-    transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 6px 18px rgba(28, 20, 15, 0.25);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    box-shadow: 0 8px 32px rgba(28, 20, 15, 0.2);
   }
 
   .action-btn:hover {
-    transform: translateY(calc(-1 * var(--lift) - 4px));
-    background: rgba(232, 163, 61, 0.28);
+    transform: translateY(calc(-1 * var(--lift) - 6px)) scale(1.08);
+    background: rgba(232, 163, 61, 0.32);
+    border-color: rgba(232, 163, 61, 0.6);
+    box-shadow: 0 10px 24px rgba(232, 163, 61, 0.25), 0 0 12px rgba(232, 163, 61, 0.15);
+  }
+
+  .action-btn:active {
+    transform: translateY(calc(-1 * var(--lift) - 2px)) scale(0.96);
+  }
+
+  .action-btn.active {
+    background: rgba(232, 163, 61, 0.45);
+    border-color: var(--cozy-amber);
+    box-shadow: 0 0 15px rgba(232, 163, 61, 0.4);
   }
 
   .action-btn.primary {
