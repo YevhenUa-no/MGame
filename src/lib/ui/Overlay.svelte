@@ -3,7 +3,6 @@
   import gsap from 'gsap';
 
   export let onEmoji = () => {};
-  export let onSit = () => {};
 
   let cornerEl;
   let arcEl;
@@ -12,21 +11,10 @@
 
   let chatOpen = false;
   let isTouch = false;
-  let isSitting = false;
   const emojis = ['👋', '🌿', '☀️', '🍃', '💤', '✨'];
-
-  function toggleSit() {
-    isSitting = !isSitting;
-    onSit(isSitting);
-  }
 
   onMount(() => {
     isTouch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-
-    const handleStandUp = () => {
-      isSitting = false;
-    };
-    window.addEventListener('player-stand-up', handleStandUp);
 
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
     tl.from(cornerEl, { y: -16, opacity: 0, duration: 0.7 })
@@ -37,10 +25,6 @@
       );
 
     gsap.set(chatMenuEl, { opacity: 0, scale: 0.85, transformOrigin: '50% 100%', pointerEvents: 'none' });
-
-    return () => {
-      window.removeEventListener('player-stand-up', handleStandUp);
-    };
   });
 
   function toggleChat() {
@@ -145,15 +129,6 @@
     </button>
     <button class="action-btn primary" style="--i: 1" on:click={wave} aria-label="Wave">
       👋
-    </button>
-    <button
-      class="action-btn"
-      class:active={isSitting}
-      style="--i: 2"
-      on:click={toggleSit}
-      aria-label="Sit down"
-    >
-      {isSitting ? '✨' : '🧘'}
     </button>
   </div>
 </div>
@@ -262,12 +237,6 @@
 
   .action-btn:active {
     transform: translateY(calc(-1 * var(--lift) - 2px)) scale(0.96);
-  }
-
-  .action-btn.active {
-    background: rgba(232, 163, 61, 0.45);
-    border-color: var(--cozy-amber);
-    box-shadow: 0 0 15px rgba(232, 163, 61, 0.4);
   }
 
   .action-btn.primary {

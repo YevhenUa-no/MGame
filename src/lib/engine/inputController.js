@@ -6,10 +6,7 @@ const KEY_MAP = {
   KeyA: 'left',
   ArrowLeft: 'left',
   KeyD: 'right',
-  ArrowRight: 'right',
-  Space: 'jump',
-  ShiftLeft: 'run',
-  ShiftRight: 'run'
+  ArrowRight: 'right'
 };
 
 /**

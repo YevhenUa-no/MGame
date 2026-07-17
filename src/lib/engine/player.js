@@ -4,8 +4,6 @@ const GRAVITY = -28;
 const MOVE_ACCEL = 55;
 const MOVE_DAMPING = 10;
 const WALK_SPEED = 4.4;
-const RUN_SPEED = 7.2;
-const JUMP_SPEED = 9;
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
 // inside the animation loop is one of the most common sources of GC
@@ -231,7 +229,7 @@ export function buildCharacterModel(colorHexOrRGB) {
   return group;
 }
 
-export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, isSitting = false) {
+export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed) {
   if (!mesh.userData || !mesh.userData.pivot) return;
   const { pivot, leftLegPivot, rightLegPivot, leftArmPivot, rightArmPivot, head } = mesh.userData;
 
@@ -239,48 +237,7 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, isSi
   const time = mesh.userData.animationTime;
   const t = 1 - Math.exp(-12 * deltaTime);
 
-  if (isSitting) {
-    leftLegPivot.rotation.x += (-1.2 - leftLegPivot.rotation.x) * t;
-    leftLegPivot.rotation.y += (0.5 - leftLegPivot.rotation.y) * t;
-    leftLegPivot.rotation.z += (0.5 - leftLegPivot.rotation.z) * t;
-
-    rightLegPivot.rotation.x += (-1.2 - rightLegPivot.rotation.x) * t;
-    rightLegPivot.rotation.y += (-0.5 - rightLegPivot.rotation.y) * t;
-    rightLegPivot.rotation.z += (-0.5 - rightLegPivot.rotation.z) * t;
-
-    leftArmPivot.rotation.x += (-0.8 - leftArmPivot.rotation.x) * t;
-    leftArmPivot.rotation.y += (0.3 - leftArmPivot.rotation.y) * t;
-    leftArmPivot.rotation.z += (0.3 - leftArmPivot.rotation.z) * t;
-
-    rightArmPivot.rotation.x += (-0.8 - rightArmPivot.rotation.x) * t;
-    rightArmPivot.rotation.y += (-0.3 - rightArmPivot.rotation.y) * t;
-    rightArmPivot.rotation.z += (-0.3 - rightArmPivot.rotation.z) * t;
-
-    const breathe = Math.sin(time * 1.5) * 0.04;
-    pivot.position.y += (-0.35 + breathe - pivot.position.y) * t;
-    pivot.rotation.x += (0 - pivot.rotation.x) * t;
-    head.position.y = 0.28 + Math.sin(time * 1.5) * 0.01;
-  } else if (!isGrounded) {
-    leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
-    leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
-    rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
-    rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
-
-    leftLegPivot.rotation.x += (0.2 - leftLegPivot.rotation.x) * t;
-    rightLegPivot.rotation.x += (-0.2 - rightLegPivot.rotation.x) * t;
-    
-    leftArmPivot.rotation.x += (-0.6 - leftArmPivot.rotation.x) * t;
-    leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
-    leftArmPivot.rotation.z += (0.4 - leftArmPivot.rotation.z) * t;
-
-    rightArmPivot.rotation.x += (-0.6 - rightArmPivot.rotation.x) * t;
-    rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
-    rightArmPivot.rotation.z += (-0.4 - rightArmPivot.rotation.z) * t;
-
-    pivot.position.y += (-0.05 - pivot.position.y) * t;
-    pivot.rotation.x += (0.05 - pivot.rotation.x) * t;
-    head.position.y = 0.28;
-  } else if (horizontalSpeed > 0.1) {
+  if (horizontalSpeed > 0.1) {
     leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
     leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
     rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
@@ -288,9 +245,8 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, isSi
     leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
     rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
 
-    const isRunning = horizontalSpeed > 5.0;
-    const frequency = isRunning ? 16 : 10;
-    const amplitude = isRunning ? 0.75 : 0.45;
+    const frequency = 10;
+    const amplitude = 0.45;
 
     leftLegPivot.rotation.x = Math.sin(time * frequency) * amplitude;
     rightLegPivot.rotation.x = -Math.sin(time * frequency) * amplitude;
@@ -300,10 +256,10 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, isSi
     leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
     rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
 
-    const bob = Math.abs(Math.sin(time * frequency)) * (isRunning ? 0.08 : 0.04);
+    const bob = Math.abs(Math.sin(time * frequency)) * 0.04;
     pivot.position.y += (-0.05 + bob - pivot.position.y) * t;
 
-    const lean = isRunning ? 0.16 : 0.08;
+    const lean = 0.08;
     pivot.rotation.x += (lean - pivot.rotation.x) * t;
 
     head.position.y = 0.28 + Math.cos(time * frequency) * 0.012;
@@ -335,7 +291,7 @@ export function createPlayer(scene) {
   const cylinderLength = 0.9;
 
   const mesh = buildCharacterModel(0xf4c98b);
-  mesh.position.set(0, 3, 4);
+  mesh.position.set(0, 0.8, 4);
   scene.add(mesh);
 
   const halfLength = cylinderLength / 2;
@@ -352,7 +308,6 @@ export function createPlayer(scene) {
     capsuleInfo,
     velocity: new THREE.Vector3(),
     isGrounded: false,
-    isSitting: false,
     height: cylinderLength + radius * 2
   };
 }
@@ -379,20 +334,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   _moveInput.set(input.moveX, 0, input.moveZ);
   const inputMagnitude = Math.min(1, _moveInput.length());
 
-  // Automatically stand up if moving or jumping while sitting
-  if (player.isSitting) {
-    if (inputMagnitude > 0.1 || input.jump) {
-      player.isSitting = false;
-      window.dispatchEvent(new CustomEvent('player-stand-up'));
-    }
-  }
-
-  if (player.isSitting) {
-    // If sitting, ignore input and decelerate to a stop
-    const damp = Math.exp(-MOVE_DAMPING * deltaTime);
-    velocity.x *= damp;
-    velocity.z *= damp;
-  } else if (inputMagnitude > 0.01) {
+  if (inputMagnitude > 0.01) {
     _moveInput.normalize();
 
     _forward.set(0, 0, -1).applyAxisAngle(_upAxis, cameraYaw);
@@ -404,7 +346,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       .addScaledVector(_forward, _moveInput.z)
       .normalize();
 
-    const targetSpeed = (input.run ? RUN_SPEED : WALK_SPEED) * inputMagnitude;
+    const targetSpeed = WALK_SPEED * inputMagnitude;
     velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, MOVE_ACCEL * deltaTime);
     velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, MOVE_ACCEL * deltaTime);
 
@@ -414,11 +356,6 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
     const damp = Math.exp(-MOVE_DAMPING * deltaTime);
     velocity.x *= damp;
     velocity.z *= damp;
-  }
-
-  if (input.jump && player.isGrounded && !player.isSitting) {
-    velocity.y = JUMP_SPEED;
-    player.isGrounded = false;
   }
 
   // --- 3. Integrate position ------------------------------------------------
@@ -486,13 +423,13 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 5. Fallback safety net ------------------------------------------------
   if (mesh.position.y < -10) {
-    mesh.position.set(0, 3, 4);
+    mesh.position.set(0, 0.8, 4);
     velocity.set(0, 0, 0);
   }
 
   // --- 6. Animate Avatar ---------------------------------------------------
-  const horizontalSpeed = player.isSitting ? 0 : Math.hypot(velocity.x, velocity.z);
-  animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed, player.isSitting);
+  const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
+  animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed);
 }
 
 function lerpAngle(current, target, t) {

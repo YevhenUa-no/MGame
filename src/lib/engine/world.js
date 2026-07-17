@@ -59,7 +59,6 @@ export function buildWorld(scene) {
   clearingMesh.receiveShadow = true;
   clearingMesh.castShadow = false;
   group.add(clearingMesh);
-  collidableGeometries.push(prepForMerge(clearingGeo, clearingMesh));
 
   // --- Obstacles: crates, walls, and rock clusters scattered across 2x larger map --
   const obstacleDefs = [

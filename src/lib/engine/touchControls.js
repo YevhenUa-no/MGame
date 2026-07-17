@@ -34,18 +34,12 @@ export function createTouchControls(inputState) {
         <div class="joystick-knob"></div>
       </div>
     </div>
-    <div class="touch-action-buttons">
-      <button type="button" class="touch-btn run-btn" aria-label="Hold to run">RUN</button>
-      <button type="button" class="touch-btn jump-btn" aria-label="Jump">JUMP</button>
-    </div>
   `;
   document.body.appendChild(root);
 
   const zone = root.querySelector('.joystick-zone');
   const base = root.querySelector('.joystick-base');
   const knob = root.querySelector('.joystick-knob');
-  const runBtn = root.querySelector('.run-btn');
-  const jumpBtn = root.querySelector('.jump-btn');
 
   let activeTouchId = null;
   let originX = 0;
@@ -118,28 +112,8 @@ export function createTouchControls(inputState) {
   zone.addEventListener('touchend', onTouchEnd, { passive: true });
   zone.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
-  // Run + jump are simple hold-buttons — held state maps straight onto the
-  // same input.run / input.jump booleans the keyboard path already sets.
-  function bindHoldButton(button, key) {
-    const press = (event) => {
-      event.preventDefault();
-      inputState[key] = true;
-    };
-    const release = () => {
-      inputState[key] = false;
-    };
-    button.addEventListener('touchstart', press, { passive: false });
-    button.addEventListener('touchend', release, { passive: true });
-    button.addEventListener('touchcancel', release, { passive: true });
-  }
-
-  bindHoldButton(runBtn, 'run');
-  bindHoldButton(jumpBtn, 'jump');
-
   function dispose() {
     resetJoystick();
-    inputState.run = false;
-    inputState.jump = false;
     root.remove();
   }
 
