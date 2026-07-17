@@ -310,6 +310,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 1. Gravity ----------------------------------------------------------
   velocity.y += GRAVITY * deltaTime;
+  if (velocity.y < -20) velocity.y = -20;
 
   // --- 2. Input -> desired horizontal velocity (camera-relative) ----------
   _moveInput.set(input.moveX, 0, input.moveZ);
@@ -363,23 +364,8 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       intersectsTriangle: (tri) => {
         const distance = tri.closestPointToSegment(_tempSegment, _tempVector, _tempVector2);
         if (distance < capsuleInfo.radius) {
-          const normal = _deltaVector;
-          tri.getNormal(normal);
-          
-          // Vector from triangle closest point to segment midpoint
-          const toCapsule = _forward;
-          toCapsule.addVectors(_tempSegment.start, _tempSegment.end).multiplyScalar(0.5).sub(_tempVector2);
-          
-          if (normal.dot(toCapsule) < 0) {
-            normal.negate();
-          }
-          
-          const direction = normal;
-          if (distance > 1e-4) {
-            direction.subVectors(_tempVector, _tempVector2).normalize();
-          }
-          
           const depth = capsuleInfo.radius - distance;
+          const direction = _tempVector.sub(_tempVector2).normalize();
           _tempSegment.start.addScaledVector(direction, depth);
           _tempSegment.end.addScaledVector(direction, depth);
         }
