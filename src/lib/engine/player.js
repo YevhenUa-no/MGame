@@ -272,7 +272,7 @@ export function createPlayer(scene) {
   const cylinderLength = 0.9;
 
   const mesh = buildCharacterModel(0xf4c98b);
-  mesh.position.set(0, 0.8, 4);
+  mesh.position.set(0, 1.0, 4);
   scene.add(mesh);
 
   const halfLength = cylinderLength / 2;
@@ -391,7 +391,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 5. Fallback safety net ------------------------------------------------
   if (mesh.position.y < -10) {
-    mesh.position.set(0, 0.8, 4);
+    mesh.position.set(0, 1.0, 4);
     velocity.set(0, 0, 0);
   }
 
