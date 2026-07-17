@@ -365,7 +365,9 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
         const distance = tri.closestPointToSegment(_tempSegment, _tempVector, _tempVector2);
         if (distance < capsuleInfo.radius) {
           const depth = capsuleInfo.radius - distance;
-          const direction = _tempVector.sub(_tempVector2).normalize();
+          // _tempVector is on triangle, _tempVector2 is on segment.
+          // Direction must point FROM triangle TO segment to push it away.
+          const direction = _tempVector2.sub(_tempVector).normalize();
           _tempSegment.start.addScaledVector(direction, depth);
           _tempSegment.end.addScaledVector(direction, depth);
         }
