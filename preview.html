@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Level Editor Preview</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        canvas { display: block; }
+        #export-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #export-btn:hover { background: #45a049; }
+        #code-overlay {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%; height: 80%;
+            background: rgba(30, 30, 30, 0.95);
+            padding: 20px;
+            border-radius: 8px;
+            color: #ddd;
+            flex-direction: column;
+        }
+        #code-overlay textarea {
+            flex: 1;
+            width: 100%;
+            background: #111;
+            color: #4caf50;
+            border: 1px solid #444;
+            font-family: monospace;
+            padding: 10px;
+            margin-top: 10px;
+            box-sizing: border-box;
+        }
+        #close-btn {
+            align-self: flex-end;
+            padding: 5px 10px;
+            background: #e53935;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        #asset-library {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: auto;
+        }
+        .asset-btn {
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-align: left;
+        }
+        .asset-btn:hover {
+            background: #444;
+        }
+    </style>
+</head>
+<body>
+    <div id="asset-library">
+        <button class="asset-btn" draggable="true" data-type="crate">📦 Add Crate</button>
+        <button class="asset-btn" draggable="true" data-type="rock">🪨 Add Rock</button>
+        <button class="asset-btn" draggable="true" data-type="wall">🧱 Add Wall</button>
+        <button class="asset-btn" draggable="true" data-type="log">🪵 Add Log</button>
+        <button class="asset-btn" draggable="true" data-type="stump">🪵 Add Stump</button>
+        <button class="asset-btn" draggable="true" data-type="barrel">🛢️ Add Barrel</button>
+        <button class="asset-btn" draggable="true" data-type="bush">🪴 Add Bush</button>
+        <button class="asset-btn" draggable="true" data-type="tree">🌲 Add Tree</button>
+        <button class="asset-btn" draggable="true" data-type="lamppost">💡 Add Lamppost</button>
+        <button class="asset-btn" draggable="true" data-type="bench">🪑 Add Bench</button>
+    </div>
+
+    <button id="export-btn">Export Code</button>
+    
+    <div id="code-overlay">
+        <button id="close-btn">Close</button>
+        <h3>Copy this into world.js (obstacleDefs array)</h3>
+        <textarea id="code-output" readonly></textarea>
+    </div>
+
+    <script type="module">
+        import { createCore } from './src/lib/engine/core.js';
+        import { buildWorld, createObstacle } from './src/lib/engine/world.js';
+        import { buildLighting } from './src/lib/engine/lighting.js';
+        
+        import * as THREE from 'three';
+        import GUI from 'https://esm.sh/lil-gui';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+        // 1. SCENE SETUP
+        const canvas = document.createElement('canvas');
+        document.body.insertBefore(canvas, document.body.firstChild);
+        const core = createCore(canvas);
+        const { scene, camera, renderer } = core;
+
+        camera.position.set(0, 15, 15);
+        camera.lookAt(0, 0, 0);
+
+        // 2. WORLD
+        buildLighting(scene);
+        const { group: environmentGroup } = buildWorld(scene);
+
+        // 3. CONTROLS
+        const orbit = new OrbitControls(camera, renderer.domElement);
+        orbit.enableDamping = true;
+
+        const transformControl = new TransformControls(camera, renderer.domElement);
+        transformControl.addEventListener('dragging-changed', function (event) {
+            orbit.enabled = !event.value;
+        });
+        scene.add(transformControl);
+
+        // 4. SELECTION LOGIC
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let selectedMesh = null;
+
+        const gui = new GUI();
+        const editorParams = {
+            transformMode: 'translate',
+            deselect: () => {
+                transformControl.detach();
+                selectedMesh = null;
+                gui.hide();
+            },
+            delete: () => {
+                if (selectedMesh) {
+                    environmentGroup.remove(selectedMesh);
+                    transformControl.detach();
+                    selectedMesh = null;
+                    gui.hide();
+                }
+            }
+        };
+
+        const modeController = gui.add(editorParams, 'transformMode', ['translate', 'rotate', 'scale']).name('Mode').onChange(v => transformControl.setMode(v));
+        gui.add(editorParams, 'deselect').name('Deselect');
+        gui.add(editorParams, 'delete').name('🗑️ Delete Object');
+        
+        gui.hide(); // Hide initially
+
+        // Handle delete key
+        window.addEventListener('keydown', (e) => {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMesh) {
+                editorParams.delete();
+            }
+        });
+
+        // Spawn logic (Click OR Drag & Drop)
+        document.querySelectorAll('.asset-btn').forEach(btn => {
+            // Click to spawn in center
+            btn.addEventListener('click', (e) => {
+                spawnAsset(e.target.getAttribute('data-type'), false);
+            });
+            // Drag to spawn on map
+            btn.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.getAttribute('data-type'));
+            });
+        });
+
+        window.addEventListener('dragover', (e) => { e.preventDefault(); });
+
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('text/plain');
+            if (type) {
+                spawnAsset(type, true, e.clientX, e.clientY);
+            }
+        });
+
+        function spawnAsset(type, useDrop, clientX, clientY) {
+            const def = { type, pos: [0, 0, 0] };
+                if (['crate', 'rock', 'log', 'stump', 'barrel', 'bush', 'tree', 'lamppost', 'bench'].includes(type)) def.scale = 1;
+                if (['wall', 'log', 'lamppost', 'bench'].includes(type)) def.rot = 0;
+                if (type === 'wall') def.length = 4;
+
+            const mesh = createObstacle(def);
+            mesh.userData.def = def;
+            
+            if (useDrop) {
+                mouse.x = (clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+                const target = new THREE.Vector3();
+                raycaster.ray.intersectPlane(plane, target);
+                mesh.position.x = target.x;
+                mesh.position.z = target.z;
+            } else {
+                // Spawn in front of the camera
+                const spawnPos = new THREE.Vector3(0, 0, -5).applyMatrix4(camera.matrixWorld);
+                mesh.position.x = spawnPos.x;
+                mesh.position.z = spawnPos.z;
+            }
+            
+            // Auto-calculate appropriate Y coordinate so it spawns on the floor
+            if (type === 'crate') mesh.position.y = 1.1 / 2;
+            if (type === 'wall') mesh.position.y = 0.7;
+            if (type === 'rock') mesh.position.y = 0.55;
+            if (type === 'log') mesh.position.y = 0.35;
+            if (type === 'stump') mesh.position.y = 0.3;
+            if (type === 'barrel') mesh.position.y = 0.5;
+            if (type === 'bush') mesh.position.y = 0.5;
+            // tree, lamppost, bench are baseline 0
+
+            environmentGroup.add(mesh);
+            
+            // Auto-select
+            selectedMesh = mesh;
+            transformControl.attach(mesh);
+            gui.show();
+        }
+
+        window.addEventListener('click', (event) => {
+            // Don't raycast if clicking UI
+            if (event.target.tagName === 'BUTTON' || event.target.closest('.lil-gui')) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // Raycast only against obstacles (meshes with userData.def)
+            const obstacles = environmentGroup.children.filter(c => c.userData && c.userData.def);
+            const intersects = raycaster.intersectObjects(obstacles, true);
+
+            if (intersects.length > 0) {
+                // Find the parent object that has userData.def (for compound objects like trees)
+                let object = intersects[0].object;
+                while (object && (!object.userData || !object.userData.def)) {
+                    object = object.parent;
+                }
+
+                if (object && object !== selectedMesh) {
+                    selectedMesh = object;
+                    transformControl.attach(object);
+                    gui.show();
+                }
+            }
+        });
+
+        // 5. EXPORT LOGIC
+        document.getElementById('export-btn').addEventListener('click', () => {
+            const obstacles = environmentGroup.children.filter(c => c.userData && c.userData.def);
+            
+            const defs = obstacles.map(mesh => {
+                const exportDef = { ...mesh.userData.def };
+                
+                // Update rot if applicable
+                if (exportDef.rot !== undefined) {
+                    exportDef.rot = parseFloat(mesh.rotation.y.toFixed(2));
+                }
+                if (exportDef.type === 'wall' && mesh.scale.x !== 1) {
+                    exportDef.length = parseFloat((exportDef.length * mesh.scale.x).toFixed(2));
+                }
+                
+                // Update scale for objects that support it
+                if (exportDef.scale !== undefined) {
+                    const scaleFactor = Math.max(mesh.scale.x, mesh.scale.y, mesh.scale.z);
+                    if (scaleFactor !== 1) {
+                        exportDef.scale = parseFloat((exportDef.scale * scaleFactor).toFixed(2));
+                    }
+                }
+
+                // Calculate the Y offset based on the object's type and its NEW scale
+                let baseY = 0;
+                const s = exportDef.scale || 1;
+                if (exportDef.type === 'crate') baseY = 1.1 * s / 2;
+                else if (exportDef.type === 'wall') baseY = 0.7;
+                else if (exportDef.type === 'rock') baseY = 0.55 * s;
+                else if (exportDef.type === 'log') baseY = 0.35 * s;
+                else if (exportDef.type === 'stump') baseY = 0.6 * s / 2;
+                else if (exportDef.type === 'barrel') baseY = 1.0 * s / 2;
+                else if (exportDef.type === 'bush') baseY = 0.5 * s;
+
+                // Update pos [X, Y, Z]
+                exportDef.pos = [
+                    parseFloat(mesh.position.x.toFixed(2)),
+                    parseFloat((mesh.position.y - baseY).toFixed(2)),
+                    parseFloat(mesh.position.z.toFixed(2))
+                ];
+                
+                return exportDef;
+            });
+
+            // Format beautifully
+            const codeString = `  const obstacleDefs = [\n` + defs.map(d => {
+                let str = `    { type: '${d.type}', pos: [${d.pos.join(', ')}]`;
+                if (d.scale !== undefined) str += `, scale: ${d.scale}`;
+                if (d.rot !== undefined) str += `, rot: ${d.rot}`;
+                if (d.length !== undefined) str += `, length: ${d.length}`;
+                str += ` }`;
+                return str;
+            }).join(',\n') + `\n  ];`;
+
+            const overlay = document.getElementById('code-overlay');
+            const output = document.getElementById('code-output');
+            overlay.style.display = 'flex';
+            output.value = codeString;
+        });
+
+        document.getElementById('close-btn').addEventListener('click', () => {
+            document.getElementById('code-overlay').style.display = 'none';
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            orbit.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
