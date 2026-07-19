@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 
-const GRAVITY = -28;
-const MOVE_ACCEL = 55;
-const MOVE_DAMPING = 10;
-const WALK_SPEED = 4.4;
-const RUN_SPEED = 7.2;
+export const PHYSICS_CONFIG = {
+  gravity: -28,
+  moveAccel: 55,
+  moveDamping: 10,
+  walkSpeed: 4.4,
+  runSpeed: 7.2,
+  jumpSpeed: 9
+};
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
 // inside the animation loop is one of the most common sources of GC
@@ -309,7 +312,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   const { mesh, capsuleInfo, velocity } = player;
 
   // --- 1. Gravity ----------------------------------------------------------
-  velocity.y += GRAVITY * deltaTime;
+  velocity.y += PHYSICS_CONFIG.gravity * deltaTime;
   if (velocity.y < -20) velocity.y = -20;
 
   // --- 2. Input -> desired horizontal velocity (camera-relative) ----------
@@ -328,16 +331,21 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       .addScaledVector(_forward, _moveInput.z)
       .normalize();
 
-    const targetSpeed = (input.run ? RUN_SPEED : WALK_SPEED) * inputMagnitude;
-    velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, MOVE_ACCEL * deltaTime);
-    velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, MOVE_ACCEL * deltaTime);
+    const targetSpeed = (input.run ? PHYSICS_CONFIG.runSpeed : PHYSICS_CONFIG.walkSpeed) * inputMagnitude;
+    velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, PHYSICS_CONFIG.moveAccel * deltaTime);
+    velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, PHYSICS_CONFIG.moveAccel * deltaTime);
 
     const targetRotation = Math.atan2(_moveDirWorld.x, _moveDirWorld.z);
     mesh.rotation.y = lerpAngle(mesh.rotation.y, targetRotation, 1 - Math.pow(0.0001, deltaTime));
   } else {
-    const damp = Math.exp(-MOVE_DAMPING * deltaTime);
+    const damp = Math.exp(-PHYSICS_CONFIG.moveDamping * deltaTime);
     velocity.x *= damp;
     velocity.z *= damp;
+  }
+
+  if (input.jump && player.isGrounded) {
+    velocity.y = PHYSICS_CONFIG.jumpSpeed;
+    player.isGrounded = false;
   }
 
   // --- 3. Integrate position ------------------------------------------------
