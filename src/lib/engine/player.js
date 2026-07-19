@@ -312,8 +312,8 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, anim
   if (!isGrounded) {
       // JUMP / FALL STATE
       // Arms thrown up and slightly out
-      leftArmPivot.rotation.x += (Math.PI * 0.7 - leftArmPivot.rotation.x) * t;
-      rightArmPivot.rotation.x += (Math.PI * 0.7 - rightArmPivot.rotation.x) * t;
+      leftArmPivot.rotation.x += (-Math.PI * 0.7 - leftArmPivot.rotation.x) * t;
+      rightArmPivot.rotation.x += (-Math.PI * 0.7 - rightArmPivot.rotation.x) * t;
       leftArmPivot.rotation.z += (0.5 - leftArmPivot.rotation.z) * t;
       rightArmPivot.rotation.z += (-0.5 - rightArmPivot.rotation.z) * t;
       
