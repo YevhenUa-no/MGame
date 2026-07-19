@@ -13,13 +13,13 @@
       jump: 'Space',
       run: 'ShiftLeft'
     },
-    moveSpeed: 5,
-    sprintMultiplier: 1.8,
-    turnSpeed: 12,
+    moveSpeed: 3.4,
+    sprintMultiplier: 2.2,
+    turnSpeed: 2.5,
     enableGravity: true,
-    gravity: -10,
-    jumpForce: 8,
-    maxFallSpeed: -32,
+    gravity: -20,
+    jumpForce: 7,
+    maxFallSpeed: -30,
     groundY: 0,
     enableCollisions: true,
     collisionRadius: 0.3,
@@ -43,26 +43,26 @@
   };
 
   const appearanceConfig = {
-    clothingColor: '#64b5f6',
-    skinColor: '#f4c98b',
-    pantsColor: '#3d5a80',
-    bootsColor: '#4f3824',
+    clothingColor: '#f764ba',
+    skinColor: '#e5b571',
+    pantsColor: '#18365d',
+    bootsColor: '#794415',
     detailsColor: '#222222',
     backpackColor: '#8a5a36',
-    sleepingBagColor: '#dc5a5a',
-    heightScale: 1.0,
-    headSize: 1.0,
-    limbThickness: 1.0,
-    torsoWidth: 1.0
+    sleepingBagColor: '#d01616',
+    heightScale: 0.96,
+    headSize: 0.94,
+    limbThickness: 0.9,
+    torsoWidth: 1.04
   };
 
   const animationConfig = {
     enableWalkAnim: true,
-    walkAnimSpeed: 10,
-    walkAnimAmplitude: 0.12,
-    enableIdleBob: true,
-    idleBobSpeed: 2,
-    idleBobAmplitude: 0.03
+    walkAnimSpeed: 7,
+    walkAnimAmplitude: 0.65,
+    enableIdleBob: false,
+    idleBobSpeed: 3.7,
+    idleBobAmplitude: 0
   };
 
   let canvasEl;
