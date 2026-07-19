@@ -92,6 +92,10 @@
         <button class="asset-btn" draggable="true" data-type="tree">🌲 Add Tree</button>
         <button class="asset-btn" draggable="true" data-type="lamppost">💡 Add Lamppost</button>
         <button class="asset-btn" draggable="true" data-type="bench">🪑 Add Bench</button>
+        <hr style="border-color: #555; margin: 5px 0;">
+        <label style="color: white; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="toggle-collisions"> Show Collisions
+        </label>
     </div>
 
     <button id="export-btn">Export Code</button>
@@ -124,6 +128,41 @@
         // 2. WORLD
         buildLighting(scene);
         const { group: environmentGroup } = buildWorld(scene);
+
+        // 2.5 COLLISION HELPERS
+        const collisionHelpers = new THREE.Group();
+        collisionHelpers.visible = false;
+        scene.add(collisionHelpers);
+
+        document.getElementById('toggle-collisions').addEventListener('change', (e) => {
+            collisionHelpers.visible = e.target.checked;
+        });
+
+        let helpersList = [];
+        const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true, transparent: true, opacity: 0.5 });
+        
+        function updateCollisionHelpers() {
+            if (!collisionHelpers.visible) return;
+            
+            // Clear existing helpers completely to rebuild them
+            // because geometries might change completely (drag and drop)
+            while (collisionHelpers.children.length > 0) {
+                collisionHelpers.remove(collisionHelpers.children[0]);
+            }
+
+            environmentGroup.children.forEach((obj) => {
+                if (obj.geometry && obj.geometry.type === 'PlaneGeometry') return;
+
+                obj.traverse((child) => {
+                    if (child.isMesh && child.geometry && child.geometry.type !== 'PlaneGeometry') {
+                        const helper = new THREE.Mesh(child.geometry, mat);
+                        helper.matrixAutoUpdate = false;
+                        helper.matrix.copy(child.matrixWorld);
+                        collisionHelpers.add(helper);
+                    }
+                });
+            });
+        }
 
         // 3. CONTROLS
         const orbit = new OrbitControls(camera, renderer.domElement);
@@ -331,6 +370,7 @@
         function animate() {
             requestAnimationFrame(animate);
             orbit.update();
+            updateCollisionHelpers();
             renderer.render(scene, camera);
         }
         animate();

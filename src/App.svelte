@@ -3,12 +3,74 @@
   import { createExperience } from './lib/engine/experience.js';
   import Overlay from './lib/ui/Overlay.svelte';
 
+  const characterConfig = {
+    startPosition: [0.00, 0.00, 0.00],
+    keyBindings: {
+      forward: 'KeyW',
+      backward: 'KeyS',
+      left: 'KeyA',
+      right: 'KeyD',
+      jump: 'Space',
+      run: 'ShiftLeft'
+    },
+    moveSpeed: 5,
+    sprintMultiplier: 1.8,
+    turnSpeed: 12,
+    enableGravity: true,
+    gravity: -10,
+    jumpForce: 8,
+    maxFallSpeed: -32,
+    groundY: 0,
+    enableCollisions: true,
+    collisionRadius: 0.3,
+    collisionHeight: 1.8
+  };
+
+  const cameraConfig = {
+    mode: 'follow',
+    follow: {
+      offsetX: 0,
+      offsetY: 2.6548986885658583,
+      offsetZ: 3.782159877387497,
+      smoothing: 0.15,
+      autoAlign: true,
+      autoAlignForce: 2
+    },
+    free: {
+      position: [10, 8, 10],
+      lookAtCharacter: true
+    }
+  };
+
+  const appearanceConfig = {
+    clothingColor: '#64b5f6',
+    skinColor: '#f4c98b',
+    pantsColor: '#3d5a80',
+    bootsColor: '#4f3824',
+    detailsColor: '#222222',
+    backpackColor: '#8a5a36',
+    sleepingBagColor: '#dc5a5a',
+    heightScale: 1.0,
+    headSize: 1.0,
+    limbThickness: 1.0,
+    torsoWidth: 1.0
+  };
+
+  const animationConfig = {
+    enableWalkAnim: true,
+    walkAnimSpeed: 8,
+    walkAnimAmplitude: 0.55,
+    enableIdleBob: true,
+    idleBobSpeed: 1.6,
+    idleBobAmplitude: 0.02
+  };
+
   let canvasEl;
   let experience;
   let ready = false; // flips true once the scene exists, used to time the HUD's GSAP intro
 
   onMount(() => {
-    experience = createExperience(canvasEl);
+    experience = createExperience(canvasEl, characterConfig, cameraConfig, appearanceConfig, animationConfig);
     experience.start();
     // A microtask tick is enough — the renderer already has a frame queued,
     // we just need `ready` to flip after the canvas is actually mounted so

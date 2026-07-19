@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character Preview</title>
+<style>
+    body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+    canvas { display: block; }
+
+    #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(30, 30, 30, 0.8);
+        color: #ccc;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.6;
+        pointer-events: none;
+        min-width: 210px;
+    }
+    #hud b { color: #fff; }
+
+    #controls-hint {
+        position: absolute;
+        top: 20px;
+        left: 260px;
+        background: rgba(30, 30, 30, 0.65);
+        color: #999;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.6;
+        pointer-events: none;
+    }
+
+    #toolbar {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        gap: 10px;
+    }
+    .toolbar-btn {
+        padding: 10px 20px;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    #export-btn { background: #4caf50; }
+    #export-btn:hover { background: #45a049; }
+    #import-btn { background: #2196f3; }
+    #import-btn:hover { background: #1e88e5; }
+    #respawn-btn { background: #757575; }
+    #respawn-btn:hover { background: #616161; }
+
+    .overlay {
+        display: none;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%; height: 80%;
+        background: rgba(30, 30, 30, 0.97);
+        padding: 20px;
+        border-radius: 8px;
+        color: #ddd;
+        flex-direction: column;
+        z-index: 10;
+    }
+    .overlay textarea {
+        flex: 1;
+        width: 100%;
+        background: #111;
+        color: #4caf50;
+        border: 1px solid #444;
+        font-family: monospace;
+        font-size: 13px;
+        padding: 10px;
+        margin-top: 10px;
+        box-sizing: border-box;
+        resize: none;
+    }
+    .overlay-header { display: flex; justify-content: space-between; align-items: center; }
+    .overlay-actions { display: flex; gap: 8px; }
+    .overlay-actions button {
+        padding: 6px 14px; border: none; cursor: pointer; border-radius: 4px; color: white; font-size: 14px;
+    }
+    .btn-close { background: #e53935; }
+    .btn-copy { background: #4caf50; }
+    .btn-load { background: #2196f3; }
+    #import-status { margin-top: 8px; font-size: 13px; min-height: 18px; }
+    #import-status.error { color: #ff6b6b; }
+    #import-status.success { color: #69f0ae; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+    Position: <b id="hud-pos">0.00, 0.00, 0.00</b><br>
+    Grounded: <b id="hud-grounded">yes</b><br>
+    State: <b id="hud-state">idle</b><br>
+    Camera mode: <b id="hud-cam">follow</b>
+</div>
+
+<div id="controls-hint">
+    WASD / Arrows — move<br>
+    Space — jump<br>
+    Shift — sprint<br>
+    Mouse drag — orbit camera (Free mode only)
+</div>
+
+<div id="toolbar">
+    <button id="export-btn" class="toolbar-btn">Export Config</button>
+    <button id="import-btn" class="toolbar-btn">Import Config</button>
+    <button id="respawn-btn" class="toolbar-btn">Respawn</button>
+</div>
+
+<div id="export-overlay" class="overlay">
+    <div class="overlay-header">
+        <h3 style="margin:0">Copy this into your character module</h3>
+        <div class="overlay-actions">
+            <button class="btn-copy" id="copy-btn">Copy</button>
+            <button class="btn-close" id="close-export-btn">Close</button>
+        </div>
+    </div>
+    <textarea id="code-output" readonly></textarea>
+</div>
+
+<div id="import-overlay" class="overlay">
+    <div class="overlay-header">
+        <h3 style="margin:0">Paste a character config to load it</h3>
+        <div class="overlay-actions">
+            <button class="btn-load" id="load-btn">Load</button>
+            <button class="btn-close" id="close-import-btn">Close</button>
+        </div>
+    </div>
+    <textarea id="code-input" placeholder="const appearanceConfig = { ... };&#10;const movementConfig = { ... };&#10;const physicsConfig = { ... };&#10;const animationConfig = { ... };&#10;const cameraConfig = { ... };"></textarea>
+    <div id="import-status"></div>
+</div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import GUI from 'https://esm.sh/lil-gui';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import * as playerModule from './src/lib/engine/player.js';
+    window.playerModule = playerModule;
+
+    // -----------------------------------------------------------------
+    // This file intentionally does NOT import the project's world.js /
+    // core.js / lighting.js — it's a character-only viewer. The ground
+    // below is a plain dummy plane + grid + pedestal ring, not the real
+    // level, so appearance/physics/animation tuning isn't muddied by
+    // level geometry or collision.
+    // -----------------------------------------------------------------
+    const canvas = document.createElement('canvas');
+    document.body.insertBefore(canvas, document.body.firstChild);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x20242e);
+    scene.fog = new THREE.Fog(0x20242e, 15, 60);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 500);
+
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x444455, 1.0);
+    scene.add(hemi);
+    const dir = new THREE.DirectionalLight(0xffffff, 1.3);
+    dir.position.set(6, 10, 6);
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    scene.add(dir);
+
+    // Dummy ground: soft-colored plane + grid + a subtle pedestal ring
+    // right under the character, so a close-up view still reads clearly.
+    const dummyGround = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 100),
+        new THREE.MeshStandardMaterial({ color: 0x33384a })
+    );
+    dummyGround.rotation.x = -Math.PI / 2;
+    dummyGround.receiveShadow = true;
+    scene.add(dummyGround);
+    scene.add(new THREE.GridHelper(100, 40, 0x555a6b, 0x40434f));
+
+    const pedestal = new THREE.Mesh(
+        new THREE.RingGeometry(1.1, 1.3, 48),
+        new THREE.MeshBasicMaterial({ color: 0x64b5f6, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+    );
+    pedestal.rotation.x = -Math.PI / 2;
+    pedestal.position.y = 0.01;
+    scene.add(pedestal);
+
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth, h = window.innerHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+    });
+
+    // -----------------------------------------------------------------
+    // CHARACTER — a simple blocky humanoid (torso, head, two arms, two
+    // legs) built from primitives, with arm/leg pivots so they can
+    // actually swing while walking. Every part's color/proportions are
+    // GUI-editable and re-applied live (see applyAppearance below).
+    // -----------------------------------------------------------------
+    const charGroup = window.playerModule.buildCharacterModel();
+    scene.add(charGroup);
+
+    function applyAppearance() {
+        window.playerModule.updateAppearance(charGroup, params);
+    }
+
+    // -----------------------------------------------------------------
+    // PARAMETERS — all live: GUI edits apply immediately, no "apply" step.
+    // -----------------------------------------------------------------
+    const params = {
+        // Appearance
+        clothingColor: '#64b5f6',
+        skinColor: '#f4c98b',
+        pantsColor: '#3d5a80',
+        bootsColor: '#4f3824',
+        detailsColor: '#222222',
+        backpackColor: '#8a5a36',
+        sleepingBagColor: '#dc5a5a',
+        heightScale: 1.0,
+        headSize: 1.0,
+        limbThickness: 1.0,
+        torsoWidth: 1.0,
+
+        // Start / respawn
+        startX: 0, startY: 0, startZ: 0,
+
+        // Movement
+        moveSpeed: 4,
+        sprintMultiplier: 1.8,
+        turnSpeed: 12,
+
+        // Physics
+        enableGravity: true,
+        gravity: -20,
+        jumpForce: 7,
+        maxFallSpeed: -30,
+        groundY: 0,
+
+        // Animation
+        enableWalkAnim: true,
+        walkAnimSpeed: 8,
+        walkAnimAmplitude: 0.55,
+        enableIdleBob: true,
+        idleBobSpeed: 1.6,
+        idleBobAmplitude: 0.02,
+
+        // Camera — defaults are close, for a proper "character preview"
+        // framing rather than a wide gameplay view.
+        cameraMode: 'follow', // 'follow' | 'free'
+        followDistance: 3.2,
+        followHeight: 1.6,
+        followSmoothing: 0.15,
+        freeX: 2.5, freeY: 1.8, freeZ: 3.5,
+        freeLookAtChar: true,
+    };
+
+    applyAppearance();
+
+    let velocityY = 0;
+    let grounded = true;
+
+    function respawn() {
+        charGroup.position.set(params.startX, params.groundY + Math.max(0, params.startY), params.startZ);
+        charGroup.rotation.y = 0;
+        velocityY = 0;
+        grounded = true;
+    }
+    respawn();
+
+    // -----------------------------------------------------------------
+    // CAMERA
+    // -----------------------------------------------------------------
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+
+    function applyCameraMode() {
+        orbit.enabled = (params.cameraMode === 'free');
+        if (params.cameraMode === 'free') {
+            camera.position.set(params.freeX, params.freeY, params.freeZ);
+            if (params.freeLookAtChar) orbit.target.copy(charGroup.position).add(new THREE.Vector3(0, 1, 0));
+            orbit.update();
+        }
+    }
+    applyCameraMode();
+
+    function updateFollowCamera() {
+        const forward = new THREE.Vector3(Math.sin(charGroup.rotation.y), 0, Math.cos(charGroup.rotation.y));
+        const desired = charGroup.position.clone()
+            .addScaledVector(forward, -params.followDistance)
+            .add(new THREE.Vector3(0, params.followHeight, 0));
+        camera.position.lerp(desired, THREE.MathUtils.clamp(params.followSmoothing, 0.01, 1));
+        camera.lookAt(charGroup.position.clone().add(new THREE.Vector3(0, 1.1, 0)));
+    }
+
+    function updateFreeCamera() {
+        if (params.freeLookAtChar) orbit.target.copy(charGroup.position).add(new THREE.Vector3(0, 1, 0));
+        orbit.update();
+    }
+
+    // -----------------------------------------------------------------
+    // INPUT
+    // -----------------------------------------------------------------
+    const keys = new Set();
+    function isTypingInField(e) {
+        const tag = e.target.tagName;
+        return tag === 'TEXTAREA' || tag === 'INPUT';
+    }
+    window.addEventListener('keydown', (e) => {
+        if (isTypingInField(e)) return;
+        keys.add(e.code);
+        if (e.code === 'Space') {
+            e.preventDefault();
+            if (params.enableGravity && grounded) {
+                velocityY = params.jumpForce;
+                grounded = false;
+            }
+        }
+        if (e.key === 'Escape') {
+            document.getElementById('export-overlay').style.display = 'none';
+            document.getElementById('import-overlay').style.display = 'none';
+        }
+    });
+    window.addEventListener('keyup', (e) => { keys.delete(e.code); });
+
+    function smoothAngle(current, target, rate) {
+        let diff = target - current;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        return current + THREE.MathUtils.clamp(rate, 0, 1) * diff;
+    }
+
+    // -----------------------------------------------------------------
+    // MAIN LOOP
+    // -----------------------------------------------------------------
+    const clock = new THREE.Clock();
+    let animTime = 0;
+    let isMoving = false;
+
+    function updateCharacter(dt) {
+        let inputX = 0, inputZ = 0;
+        if (keys.has('KeyW') || keys.has('ArrowUp')) inputZ -= 1;
+        if (keys.has('KeyS') || keys.has('ArrowDown')) inputZ += 1;
+        if (keys.has('KeyA') || keys.has('ArrowLeft')) inputX -= 1;
+        if (keys.has('KeyD') || keys.has('ArrowRight')) inputX += 1;
+
+        const sprinting = keys.has('ShiftLeft') || keys.has('ShiftRight');
+        const speed = params.moveSpeed * (sprinting ? params.sprintMultiplier : 1);
+        isMoving = inputX !== 0 || inputZ !== 0;
+
+        if (isMoving) {
+            const len = Math.hypot(inputX, inputZ);
+            inputX /= len; inputZ /= len;
+
+            const camForward = new THREE.Vector3();
+            camera.getWorldDirection(camForward);
+            camForward.y = 0;
+            if (camForward.lengthSq() < 1e-6) camForward.set(0, 0, -1);
+            camForward.normalize();
+            const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0)).negate();
+
+            const moveDir = new THREE.Vector3()
+                .addScaledVector(camForward, -inputZ)
+                .addScaledVector(camRight, inputX);
+            if (moveDir.lengthSq() > 1e-6) {
+                moveDir.normalize();
+                charGroup.position.addScaledVector(moveDir, speed * dt);
+                const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+                charGroup.rotation.y = smoothAngle(charGroup.rotation.y, targetYaw, params.turnSpeed * dt);
+            }
+        }
+
+        if (params.enableGravity) {
+            velocityY += params.gravity * dt;
+            velocityY = Math.max(velocityY, params.maxFallSpeed);
+            charGroup.position.y += velocityY * dt;
+            if (charGroup.position.y <= params.groundY) {
+                charGroup.position.y = params.groundY;
+                velocityY = 0;
+                grounded = true;
+            } else {
+                grounded = false;
+            }
+        } else {
+            grounded = Math.abs(charGroup.position.y - params.groundY) < 0.01;
+        }
+
+        pedestal.position.set(charGroup.position.x, 0.01, charGroup.position.z);
+    }
+
+    function updateAnimation(dt) {
+        const speed = isMoving ? params.moveSpeed * (keys.has('ShiftLeft') || keys.has('ShiftRight') ? params.sprintMultiplier : 1) : 0;
+        window.playerModule.animateAvatar(charGroup, dt, grounded, speed, params);
+    }
+
+    function refreshHud() {
+        const p = charGroup.position;
+        document.getElementById('hud-pos').textContent = `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}`;
+        document.getElementById('hud-grounded').textContent = grounded ? 'yes' : 'no';
+        document.getElementById('hud-state').textContent = isMoving ? ((keys.has('ShiftLeft') || keys.has('ShiftRight')) ? 'sprinting' : 'walking') : 'idle';
+        document.getElementById('hud-cam').textContent = params.cameraMode;
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+
+        updateCharacter(dt);
+        updateAnimation(dt);
+
+        if (params.cameraMode === 'follow') updateFollowCamera();
+        else updateFreeCamera();
+
+        refreshHud();
+        renderer.render(scene, camera);
+    }
+    animate();
+
+    // -----------------------------------------------------------------
+    // GUI
+    // -----------------------------------------------------------------
+    const gui = new GUI();
+
+    const appearanceFolder = gui.addFolder('Appearance');
+    appearanceFolder.addColor(params, 'clothingColor').name('Clothing Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'skinColor').name('Skin Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'pantsColor').name('Pants Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'bootsColor').name('Boots Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'detailsColor').name('Details Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'backpackColor').name('Backpack Color').onChange(applyAppearance);
+    appearanceFolder.addColor(params, 'sleepingBagColor').name('Sleeping Bag Color').onChange(applyAppearance);
+    appearanceFolder.add(params, 'heightScale', 0.5, 2, 0.02).name('Height Scale').onChange(applyAppearance);
+    appearanceFolder.add(params, 'headSize', 0.5, 2, 0.02).name('Head Size').onChange(applyAppearance);
+    appearanceFolder.add(params, 'limbThickness', 0.4, 2.5, 0.02).name('Limb Thickness').onChange(applyAppearance);
+    appearanceFolder.add(params, 'torsoWidth', 0.5, 2, 0.02).name('Torso Width').onChange(applyAppearance);
+
+    const startFolder = gui.addFolder('Start Position');
+    startFolder.add(params, 'startX', -20, 20, 0.5).name('Start X');
+    startFolder.add(params, 'startY', 0, 10, 0.5).name('Start Y (drop height)');
+    startFolder.add(params, 'startZ', -20, 20, 0.5).name('Start Z');
+    startFolder.add({ respawn }, 'respawn').name('Respawn Here');
+
+    const moveFolder = gui.addFolder('Movement');
+    moveFolder.add(params, 'moveSpeed', 0.5, 15, 0.1).name('Move Speed');
+    moveFolder.add(params, 'sprintMultiplier', 1, 4, 0.1).name('Sprint x (Shift)');
+    moveFolder.add(params, 'turnSpeed', 1, 30, 0.5).name('Turn Speed');
+
+    const physicsFolder = gui.addFolder('Physics');
+    physicsFolder.add(params, 'enableGravity').name('Enable Gravity').onChange(() => { velocityY = 0; });
+    physicsFolder.add(params, 'gravity', -60, -1, 0.5).name('Gravity');
+    physicsFolder.add(params, 'jumpForce', 0, 20, 0.5).name('Jump Force');
+    physicsFolder.add(params, 'maxFallSpeed', -80, -5, 1).name('Max Fall Speed');
+    physicsFolder.add(params, 'groundY', -5, 5, 0.1).name('Ground Y');
+
+    const animFolder = gui.addFolder('Animation');
+    animFolder.add(params, 'enableWalkAnim').name('Walk Animation');
+    animFolder.add(params, 'walkAnimSpeed', 1, 20, 0.5).name('Walk Anim Speed');
+    animFolder.add(params, 'walkAnimAmplitude', 0.05, 1.2, 0.05).name('Walk Anim Amplitude');
+    animFolder.add(params, 'enableIdleBob').name('Idle Bob');
+    animFolder.add(params, 'idleBobSpeed', 0.2, 5, 0.1).name('Idle Bob Speed');
+    animFolder.add(params, 'idleBobAmplitude', 0, 0.1, 0.005).name('Idle Bob Amplitude');
+
+    const camFolder = gui.addFolder('Camera');
+    camFolder.add(params, 'cameraMode', ['follow', 'free']).name('Mode').onChange(applyCameraMode);
+    const followFolder = camFolder.addFolder('Follow settings');
+    followFolder.add(params, 'followDistance', 1, 12, 0.1).name('Distance');
+    followFolder.add(params, 'followHeight', 0, 8, 0.1).name('Height');
+    followFolder.add(params, 'followSmoothing', 0.01, 1, 0.01).name('Smoothing');
+    const freeFolder = camFolder.addFolder('Free settings');
+    freeFolder.add(params, 'freeX', -20, 20, 0.5).name('Position X');
+    freeFolder.add(params, 'freeY', -5, 20, 0.5).name('Position Y');
+    freeFolder.add(params, 'freeZ', -20, 20, 0.5).name('Position Z');
+    freeFolder.add({ snap: () => { camera.position.set(params.freeX, params.freeY, params.freeZ); orbit.update(); } }, 'snap').name('Snap Camera Here');
+    freeFolder.add(params, 'freeLookAtChar').name('Look At Character');
+    freeFolder.add({
+        focus: () => {
+            params.freeX = 2.5; params.freeY = 1.8; params.freeZ = 3.5;
+            camFolder.controllersRecursive().forEach(c => c.updateDisplay());
+            camera.position.set(params.freeX, params.freeY, params.freeZ);
+            orbit.target.copy(charGroup.position).add(new THREE.Vector3(0, 1, 0));
+            orbit.update();
+        }
+    }, 'focus').name('Focus Close-Up');
+
+    // -----------------------------------------------------------------
+    // EXPORT / IMPORT
+    // -----------------------------------------------------------------
+    const exportOverlay = document.getElementById('export-overlay');
+    const importOverlay = document.getElementById('import-overlay');
+
+    function buildExportCode() {
+        return `  // Character preview config — generated by the Character Preview tool.
+  // Rename keys as needed to match your player/character module.
+  const appearanceConfig = {
+    clothingColor: '${params.clothingColor}',
+    skinColor: '${params.skinColor}',
+    pantsColor: '${params.pantsColor}',
+    bootsColor: '${params.bootsColor}',
+    detailsColor: '${params.detailsColor}',
+    backpackColor: '${params.backpackColor}',
+    sleepingBagColor: '${params.sleepingBagColor}',
+    heightScale: ${params.heightScale},
+    headSize: ${params.headSize},
+    limbThickness: ${params.limbThickness},
+    torsoWidth: ${params.torsoWidth}
+  };
+
+  const movementConfig = {
+    startPosition: [${params.startX}, ${params.startY}, ${params.startZ}],
+    moveSpeed: ${params.moveSpeed},
+    sprintMultiplier: ${params.sprintMultiplier},
+    turnSpeed: ${params.turnSpeed}
+  };
+
+  const physicsConfig = {
+    enableGravity: ${params.enableGravity},
+    gravity: ${params.gravity},
+    jumpForce: ${params.jumpForce},
+    maxFallSpeed: ${params.maxFallSpeed},
+    groundY: ${params.groundY}
+  };
+
+  const animationConfig = {
+    enableWalkAnim: ${params.enableWalkAnim},
+    walkAnimSpeed: ${params.walkAnimSpeed},
+    walkAnimAmplitude: ${params.walkAnimAmplitude},
+    enableIdleBob: ${params.enableIdleBob},
+    idleBobSpeed: ${params.idleBobSpeed},
+    idleBobAmplitude: ${params.idleBobAmplitude}
+  };
+
+  const cameraConfig = {
+    mode: '${params.cameraMode}',
+    follow: { distance: ${params.followDistance}, height: ${params.followHeight}, smoothing: ${params.followSmoothing} },
+    free: { position: [${params.freeX}, ${params.freeY}, ${params.freeZ}], lookAtCharacter: ${params.freeLookAtChar} }
+  };`;
+    }
+
+    document.getElementById('export-btn').addEventListener('click', () => {
+        document.getElementById('code-output').value = buildExportCode();
+        exportOverlay.style.display = 'flex';
+    });
+    document.getElementById('close-export-btn').addEventListener('click', () => { exportOverlay.style.display = 'none'; });
+    document.getElementById('copy-btn').addEventListener('click', async () => {
+        const output = document.getElementById('code-output');
+        output.select();
+        try {
+            await navigator.clipboard.writeText(output.value);
+            const btn = document.getElementById('copy-btn');
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        } catch (err) {
+            console.warn('Clipboard copy failed, text is selected for manual copy:', err);
+        }
+    });
+
+    function extractObject(text, name) {
+        const re = new RegExp(name + '\\s*=\\s*(\\{[\\s\\S]*?\\n\\s*\\};?)', 'm');
+        const m = text.match(re);
+        if (!m) return null;
+        const literal = m[1].replace(/;\s*$/, '');
+        return Function('"use strict"; return (' + literal + ');')();
+    }
+
+    function applyImportedConfig(text) {
+        const appearance = extractObject(text, 'appearanceConfig');
+        const movement = extractObject(text, 'movementConfig');
+        const physics = extractObject(text, 'physicsConfig');
+        const animation = extractObject(text, 'animationConfig');
+        const cam = extractObject(text, 'cameraConfig');
+
+        if (!appearance && !movement && !physics && !animation && !cam) {
+            throw new Error('No appearanceConfig / movementConfig / physicsConfig / animationConfig / cameraConfig object found.');
+        }
+
+        if (appearance) {
+            for (const key of ['bodyColor', 'headColor', 'limbColor', 'accentColor', 'heightScale', 'headSize', 'limbThickness', 'torsoWidth']) {
+                if (appearance[key] !== undefined) params[key] = appearance[key];
+            }
+        }
+        if (movement) {
+            if (Array.isArray(movement.startPosition)) [params.startX, params.startY, params.startZ] = movement.startPosition;
+            if (typeof movement.moveSpeed === 'number') params.moveSpeed = movement.moveSpeed;
+            if (typeof movement.sprintMultiplier === 'number') params.sprintMultiplier = movement.sprintMultiplier;
+            if (typeof movement.turnSpeed === 'number') params.turnSpeed = movement.turnSpeed;
+        }
+        if (physics) {
+            for (const key of ['enableGravity', 'gravity', 'jumpForce', 'maxFallSpeed', 'groundY']) {
+                if (physics[key] !== undefined) params[key] = physics[key];
+            }
+        }
+        if (animation) {
+            for (const key of ['enableWalkAnim', 'walkAnimSpeed', 'walkAnimAmplitude', 'enableIdleBob', 'idleBobSpeed', 'idleBobAmplitude']) {
+                if (animation[key] !== undefined) params[key] = animation[key];
+            }
+        }
+        if (cam) {
+            if (cam.mode === 'follow' || cam.mode === 'free') params.cameraMode = cam.mode;
+            if (cam.follow) {
+                if (typeof cam.follow.distance === 'number') params.followDistance = cam.follow.distance;
+                if (typeof cam.follow.height === 'number') params.followHeight = cam.follow.height;
+                if (typeof cam.follow.smoothing === 'number') params.followSmoothing = cam.follow.smoothing;
+            }
+            if (cam.free) {
+                if (Array.isArray(cam.free.position)) [params.freeX, params.freeY, params.freeZ] = cam.free.position;
+                if (typeof cam.free.lookAtCharacter === 'boolean') params.freeLookAtChar = cam.free.lookAtCharacter;
+            }
+        }
+
+        gui.controllersRecursive().forEach(c => c.updateDisplay());
+        applyAppearance();
+        applyCameraMode();
+        respawn();
+    }
+
+    document.getElementById('import-btn').addEventListener('click', () => {
+        document.getElementById('import-status').textContent = '';
+        document.getElementById('import-status').className = '';
+        importOverlay.style.display = 'flex';
+    });
+    document.getElementById('close-import-btn').addEventListener('click', () => { importOverlay.style.display = 'none'; });
+    document.getElementById('load-btn').addEventListener('click', () => {
+        const text = document.getElementById('code-input').value;
+        const status = document.getElementById('import-status');
+        try {
+            applyImportedConfig(text);
+            status.className = 'success';
+            status.textContent = 'Config loaded and applied.';
+        } catch (err) {
+            status.className = 'error';
+            status.textContent = err.message;
+        }
+    });
+
+    document.getElementById('respawn-btn').addEventListener('click', respawn);
+</script>
+</body>
+</html>

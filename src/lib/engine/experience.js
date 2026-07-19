@@ -20,20 +20,20 @@ const MAX_SUBSTEPS = 5; // avoids a spiral-of-death on a big frame hitch/tab-swi
 // remotePlayers.js interpolates between updates.
 const NETWORK_SEND_INTERVAL = 1 / 15;
 
-export function createExperience(canvas) {
+export function createExperience(canvas, characterConfig = {}, cameraConfig = {}, appearanceConfig = {}, animationConfig = {}) {
   const { scene, camera, renderer, clock, dispose: disposeCore } = createCore(canvas);
 
   buildLighting(scene);
   const { collider } = buildWorld(scene);
-  const player = createPlayer(scene);
-  const input = createInputController();
+  const player = createPlayer(scene, characterConfig, appearanceConfig, animationConfig);
+  const input = createInputController(characterConfig.keyBindings);
   // Shares `input.state` — the touch joystick and run/jump buttons write
   // into the exact same object the keyboard controller does, so player.js
   // reads one unified contract regardless of input source. On a
   // non-touch device this returns { enabled: false, dispose(){} } and
   // mounts nothing.
   const touch = createTouchControls(input.state);
-  const cameraRig = createCameraRig(camera, canvas);
+  const cameraRig = createCameraRig(camera, canvas, cameraConfig);
 
   // --- Multiplayer ----------------------------------------------------
   const remotePlayers = createRemotePlayers(scene);

@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 
-export const PHYSICS_CONFIG = {
+export const DEFAULT_PHYSICS_CONFIG = {
   gravity: -28,
   moveAccel: 55,
   moveDamping: 10,
   walkSpeed: 4.4,
   runSpeed: 7.2,
-  jumpSpeed: 9
+  jumpSpeed: 9,
+  maxFallSpeed: -50,
+  enableGravity: true
 };
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
@@ -24,60 +26,68 @@ const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
 
-export function buildCharacterModel(colorHexOrRGB) {
+export const DEFAULT_APPEARANCE = {
+  clothingColor: '#64b5f6',
+  skinColor: '#f4c98b',
+  pantsColor: '#3d5a80',
+  bootsColor: '#4f3824',
+  detailsColor: '#222222',
+  backpackColor: '#8a5a36',
+  sleepingBagColor: '#dc5a5a',
+  heightScale: 1.0,
+  headSize: 1.0,
+  limbThickness: 1.0,
+  torsoWidth: 1.0
+};
+
+export function buildCharacterModel(appearanceConfig = {}) {
+  const config = { ...DEFAULT_APPEARANCE, ...appearanceConfig };
   const group = new THREE.Group();
-  
-  let bodyColor;
-  if (Array.isArray(colorHexOrRGB)) {
-    bodyColor = new THREE.Color(colorHexOrRGB[0] / 255, colorHexOrRGB[1] / 255, colorHexOrRGB[2] / 255);
-  } else {
-    bodyColor = new THREE.Color(colorHexOrRGB);
-  }
 
   const skinMaterial = new THREE.MeshStandardMaterial({
-    color: 0xffdbac,
-    roughness: 0.8,
+    color: config.skinColor,
+    roughness: 0.6,
     flatShading: true
   });
   
   const clothingMaterial = new THREE.MeshStandardMaterial({
-    color: bodyColor,
+    color: config.clothingColor,
     roughness: 0.7,
     flatShading: true
   });
 
   const pantsMaterial = new THREE.MeshStandardMaterial({
-    color: 0x3d5a80,
+    color: config.pantsColor,
     roughness: 0.8,
     flatShading: true
   });
 
   const bootsMaterial = new THREE.MeshStandardMaterial({
-    color: 0x4f3824,
+    color: config.bootsColor,
     roughness: 0.9,
     flatShading: true
   });
 
   const detailsMaterial = new THREE.MeshStandardMaterial({
-    color: 0x222222,
+    color: config.detailsColor,
     roughness: 0.9,
     flatShading: true
   });
 
   const backpackMaterial = new THREE.MeshStandardMaterial({
-    color: 0x8a5a36,
+    color: config.backpackColor,
     roughness: 0.9,
     flatShading: true
   });
   
   const sleepingBagMaterial = new THREE.MeshStandardMaterial({
-    color: 0xdc5a5a,
+    color: config.sleepingBagColor,
     roughness: 0.8,
     flatShading: true
   });
 
   const pivot = new THREE.Group();
-  pivot.position.y = -0.05;
+  pivot.position.y = 0.72; // Shift up so feet rest exactly at y=0
   group.add(pivot);
 
   // Torso
@@ -159,7 +169,7 @@ export function buildCharacterModel(colorHexOrRGB) {
   // Legs (Pivoted at hip joint)
   const leftLegPivot = new THREE.Group();
   leftLegPivot.position.set(-0.15, -0.38, 0);
-  group.add(leftLegPivot);
+  pivot.add(leftLegPivot);
 
   const legGeo = new THREE.BoxGeometry(0.14, 0.35, 0.14);
   const leftLeg = new THREE.Mesh(legGeo, pantsMaterial);
@@ -175,7 +185,7 @@ export function buildCharacterModel(colorHexOrRGB) {
 
   const rightLegPivot = new THREE.Group();
   rightLegPivot.position.set(0.15, -0.38, 0);
-  group.add(rightLegPivot);
+  pivot.add(rightLegPivot);
 
   const rightLeg = new THREE.Mesh(legGeo, pantsMaterial);
   rightLeg.position.y = -0.175;
@@ -225,65 +235,145 @@ export function buildCharacterModel(colorHexOrRGB) {
     leftArmPivot,
     rightArmPivot,
     head,
+    leftEye,
+    rightEye,
+    hatGroup,
     torso,
     backpack,
-    sleepingBag: bag
+    sleepingBag: bag,
+    leftArm,
+    rightArm,
+    leftLeg,
+    rightLeg,
+    materials: {
+        skin: skinMaterial,
+        clothing: clothingMaterial,
+        pants: pantsMaterial,
+        boots: bootsMaterial,
+        details: detailsMaterial,
+        backpack: backpackMaterial,
+        sleepingBag: sleepingBagMaterial
+    }
   };
+
+  updateAppearance(group, config);
 
   return group;
 }
 
-export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed) {
+export function updateAppearance(mesh, config) {
+  if (!mesh.userData.materials) return;
+  const { materials, head, torso, leftArm, rightArm, leftLeg, rightLeg, backpack, sleepingBag, leftEye, rightEye, hatGroup } = mesh.userData;
+
+  materials.clothing.color.set(config.clothingColor);
+  materials.skin.color.set(config.skinColor);
+  materials.pants.color.set(config.pantsColor);
+  materials.boots.color.set(config.bootsColor);
+  materials.details.color.set(config.detailsColor);
+  materials.backpack.color.set(config.backpackColor);
+  materials.sleepingBag.color.set(config.sleepingBagColor);
+
+  mesh.scale.setScalar(config.heightScale);
+  torso.scale.set(config.torsoWidth, 1, config.torsoWidth);
+  backpack.scale.set(config.torsoWidth, 1, config.torsoWidth);
+  
+  head.scale.setScalar(config.headSize);
+  hatGroup.scale.setScalar(config.headSize);
+  leftEye.scale.setScalar(config.headSize);
+  rightEye.scale.setScalar(config.headSize);
+
+  [leftArm, rightArm, leftLeg, rightLeg].forEach(limb => {
+      limb.scale.x = config.limbThickness;
+      limb.scale.z = config.limbThickness;
+  });
+}
+
+export const DEFAULT_ANIMATION = {
+  enableWalkAnim: true,
+  walkAnimSpeed: 8,
+  walkAnimAmplitude: 0.55,
+  enableIdleBob: true,
+  idleBobSpeed: 1.6,
+  idleBobAmplitude: 0.02
+};
+
+export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, animationConfig = {}) {
   if (!mesh.userData || !mesh.userData.pivot) return;
-  const { pivot, leftLegPivot, rightLegPivot, leftArmPivot, rightArmPivot, head } = mesh.userData;
+  const config = { ...DEFAULT_ANIMATION, ...animationConfig };
+  const { pivot, leftLegPivot, rightLegPivot, leftArmPivot, rightArmPivot, head, torso, leftEye, rightEye, hatGroup } = mesh.userData;
 
   mesh.userData.animationTime = (mesh.userData.animationTime || 0) + deltaTime;
   const time = mesh.userData.animationTime;
   const t = 1 - Math.exp(-12 * deltaTime);
 
-  // Keep limbs static (flying style)
-  leftLegPivot.rotation.x += (0 - leftLegPivot.rotation.x) * t;
-  leftLegPivot.rotation.y += (0 - leftLegPivot.rotation.y) * t;
-  leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
-  rightLegPivot.rotation.x += (0 - rightLegPivot.rotation.x) * t;
-  rightLegPivot.rotation.y += (0 - rightLegPivot.rotation.y) * t;
-  rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
+  const isMoving = horizontalSpeed > 0.1;
+  const speedFactor = horizontalSpeed > 6 ? 1.4 : 1;
 
-  leftArmPivot.rotation.x += (0 - leftArmPivot.rotation.x) * t;
-  leftArmPivot.rotation.y += (0 - leftArmPivot.rotation.y) * t;
+  if (config.enableWalkAnim && isMoving && isGrounded) {
+      const swing = Math.sin(time * config.walkAnimSpeed * speedFactor) * config.walkAnimAmplitude;
+      leftArmPivot.rotation.x = swing;
+      rightArmPivot.rotation.x = -swing;
+      leftLegPivot.rotation.x = -swing;
+      rightLegPivot.rotation.x = swing;
+  } else {
+      leftArmPivot.rotation.x += (0 - leftArmPivot.rotation.x) * t;
+      rightArmPivot.rotation.x += (0 - rightArmPivot.rotation.x) * t;
+      leftLegPivot.rotation.x += (0 - leftLegPivot.rotation.x) * t;
+      rightLegPivot.rotation.x += (0 - rightLegPivot.rotation.x) * t;
+  }
+
   leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
-
-  rightArmPivot.rotation.x += (0 - rightArmPivot.rotation.x) * t;
-  rightArmPivot.rotation.y += (0 - rightArmPivot.rotation.y) * t;
   rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
 
-  // Gentle floating/hover bobbing
-  const bobFreq = horizontalSpeed > 0.1 ? 3.5 : 2.0;
-  const bobAmp = horizontalSpeed > 0.1 ? 0.04 : 0.025;
-  const bob = Math.sin(time * bobFreq) * bobAmp;
-  pivot.position.y += (-0.05 + bob - pivot.position.y) * t;
+  if (config.enableIdleBob && isGrounded) {
+      const bobActive = !(config.enableWalkAnim && isMoving);
+      if (bobActive) {
+          const bob = Math.sin(time * config.idleBobSpeed) * config.idleBobAmplitude;
+          torso.position.y = -0.1 + bob;
+          head.position.y = 0.28 + bob;
+          leftEye.position.y = 0.3 + bob;
+          rightEye.position.y = 0.3 + bob;
+          hatGroup.position.y = 0.44 + bob;
+          leftArmPivot.position.y = 0.08 + bob;
+          rightArmPivot.position.y = 0.08 + bob;
+          backpack.position.y = -0.1 + bob;
+          sleepingBag.position.y = 0.11 + bob;
+      }
+  } else {
+      torso.position.y += (-0.1 - torso.position.y) * t;
+      head.position.y += (0.28 - head.position.y) * t;
+      leftEye.position.y += (0.3 - leftEye.position.y) * t;
+      rightEye.position.y += (0.3 - rightEye.position.y) * t;
+      hatGroup.position.y += (0.44 - hatGroup.position.y) * t;
+      leftArmPivot.position.y += (0.08 - leftArmPivot.position.y) * t;
+      rightArmPivot.position.y += (0.08 - rightArmPivot.position.y) * t;
+      backpack.position.y += (-0.1 - backpack.position.y) * t;
+      sleepingBag.position.y += (0.11 - sleepingBag.position.y) * t;
+  }
 
-  // Lean forward slightly when moving (flying look)
-  const targetLean = horizontalSpeed > 0.1 ? 0.12 : 0;
-  pivot.rotation.x += (targetLean - pivot.rotation.x) * t;
-
-  head.position.y = 0.28 + Math.sin(time * bobFreq) * 0.008;
+  if (!isGrounded) {
+      const targetLean = isMoving ? 0.12 : 0;
+      pivot.rotation.x += (targetLean - pivot.rotation.x) * t;
+  } else {
+      pivot.rotation.x += (0 - pivot.rotation.x) * t;
+  }
 }
 
-export function createPlayer(scene) {
-  const radius = 0.35;
-  const cylinderLength = 0.9;
+export function createPlayer(scene, characterConfig = {}, appearanceConfig = {}, animationConfig = {}) {
+  const radius = characterConfig.collisionRadius || 0.35;
+  const cylinderLength = (characterConfig.collisionHeight || 1.6) - (radius * 2);
 
-  const mesh = buildCharacterModel(0xf4c98b);
-  mesh.position.set(0, 1.0, 4);
+  const mesh = buildCharacterModel(appearanceConfig);
+  const startPos = characterConfig.startPosition || [0, 1.0, 4];
+  mesh.position.set(...startPos);
   scene.add(mesh);
 
   const halfLength = cylinderLength / 2;
   const capsuleInfo = {
     radius,
     segment: new THREE.Line3(
-      new THREE.Vector3(0, -halfLength, 0),
-      new THREE.Vector3(0, halfLength, 0)
+      new THREE.Vector3(0, radius, 0),
+      new THREE.Vector3(0, cylinderLength + radius, 0)
     )
   };
 
@@ -292,7 +382,9 @@ export function createPlayer(scene) {
     capsuleInfo,
     velocity: new THREE.Vector3(),
     isGrounded: false,
-    height: cylinderLength + radius * 2
+    height: cylinderLength + radius * 2,
+    config: { ...DEFAULT_PHYSICS_CONFIG, ...characterConfig },
+    animationConfig
   };
 }
 
@@ -309,11 +401,20 @@ export function createPlayer(scene) {
  * @param deltaTime  seconds since last frame (already clamped by caller)
  */
 export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
-  const { mesh, capsuleInfo, velocity } = player;
+  const { mesh, capsuleInfo, velocity, config } = player;
+
+  const grav = config.gravity !== undefined ? config.gravity : DEFAULT_PHYSICS_CONFIG.gravity;
+  const maxFall = config.maxFallSpeed !== undefined ? config.maxFallSpeed : DEFAULT_PHYSICS_CONFIG.maxFallSpeed;
+  const walkSpeed = config.moveSpeed !== undefined ? config.moveSpeed : DEFAULT_PHYSICS_CONFIG.walkSpeed;
+  const runSpeed = (config.moveSpeed && config.sprintMultiplier) ? config.moveSpeed * config.sprintMultiplier : DEFAULT_PHYSICS_CONFIG.runSpeed;
+  const jumpForce = config.jumpForce !== undefined ? config.jumpForce : DEFAULT_PHYSICS_CONFIG.jumpSpeed;
+  const turnSpeed = config.turnSpeed !== undefined ? config.turnSpeed : 12;
 
   // --- 1. Gravity ----------------------------------------------------------
-  velocity.y += PHYSICS_CONFIG.gravity * deltaTime;
-  if (velocity.y < -20) velocity.y = -20;
+  if (config.enableGravity !== false) {
+    velocity.y += grav * deltaTime;
+    if (velocity.y < maxFall) velocity.y = maxFall;
+  }
 
   // --- 2. Input -> desired horizontal velocity (camera-relative) ----------
   _moveInput.set(input.moveX, 0, input.moveZ);
@@ -331,20 +432,20 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       .addScaledVector(_forward, _moveInput.z)
       .normalize();
 
-    const targetSpeed = (input.run ? PHYSICS_CONFIG.runSpeed : PHYSICS_CONFIG.walkSpeed) * inputMagnitude;
-    velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, PHYSICS_CONFIG.moveAccel * deltaTime);
-    velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, PHYSICS_CONFIG.moveAccel * deltaTime);
+    const targetSpeed = (input.run ? runSpeed : walkSpeed) * inputMagnitude;
+    velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, config.moveAccel * deltaTime);
+    velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, config.moveAccel * deltaTime);
 
     const targetRotation = Math.atan2(_moveDirWorld.x, _moveDirWorld.z);
-    mesh.rotation.y = lerpAngle(mesh.rotation.y, targetRotation, 1 - Math.pow(0.0001, deltaTime));
+    mesh.rotation.y = lerpAngle(mesh.rotation.y, targetRotation, 1 - Math.pow(0.0001, deltaTime * (turnSpeed / 12)));
   } else {
-    const damp = Math.exp(-PHYSICS_CONFIG.moveDamping * deltaTime);
+    const damp = Math.exp(-config.moveDamping * deltaTime);
     velocity.x *= damp;
     velocity.z *= damp;
   }
 
   if (input.jump && player.isGrounded) {
-    velocity.y = PHYSICS_CONFIG.jumpSpeed;
+    velocity.y = jumpForce;
     player.isGrounded = false;
   }
 
@@ -354,6 +455,8 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 4. Collision resolution against the BVH collider --------------------
   const bvh = collider.geometry.boundsTree;
+  let isCollidingWithFloor = false;
+  
   if (bvh) {
     _tempBox.makeEmpty();
     _tempMat.copy(collider.matrixWorld).invert();
@@ -383,9 +486,16 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
     });
 
     const newPosition = _tempVector.copy(_tempSegment.start).applyMatrix4(collider.matrixWorld);
+    newPosition.y -= capsuleInfo.radius; // Crucial: subtract radius to get the true mesh origin
+
     _deltaVector.subVectors(newPosition, mesh.position);
 
     const offset = Math.max(0, _deltaVector.length() - 1e-5);
+    
+    if (_deltaVector.y > 0.001 && velocity.y < 0) {
+        isCollidingWithFloor = true;
+    }
+
     _deltaVector.normalize().multiplyScalar(offset);
     mesh.position.add(_deltaVector);
 
@@ -395,14 +505,22 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
     }
   }
 
-  // --- Absolute Floor Constraint ---
-  // The capsule bottom is at mesh.position.y - 0.8. We enforce a mathematical floor at y = 0.0.
-  if (mesh.position.y <= 0.8) {
-    mesh.position.y = 0.8;
-    velocity.y = 0;
-    player.isGrounded = true;
+  // --- Fallback Floor / Grounding ---
+  const halfHeight = player.height / 2;
+  const floorY = config.groundY !== undefined ? config.groundY : 0.0;
+  
+  if (!bvh) {
+    // Hard fallback if no BVH exists
+    if (mesh.position.y <= floorY) {
+      mesh.position.y = floorY;
+      velocity.y = 0;
+      player.isGrounded = true;
+    } else {
+      player.isGrounded = false;
+    }
   } else {
-    player.isGrounded = false;
+    // If we have BVH, trust the collision flag
+    player.isGrounded = isCollidingWithFloor;
   }
 
   // --- 5. Fallback safety net ------------------------------------------------
@@ -413,7 +531,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 6. Animate Avatar ---------------------------------------------------
   const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
-  animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed);
+  animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed, player.animationConfig);
 }
 
 function lerpAngle(current, target, t) {

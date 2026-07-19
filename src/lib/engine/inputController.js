@@ -1,4 +1,4 @@
-const KEY_MAP = {
+const DEFAULT_KEY_MAP = {
   KeyW: 'forward',
   ArrowUp: 'forward',
   KeyS: 'backward',
@@ -7,6 +7,7 @@ const KEY_MAP = {
   ArrowLeft: 'left',
   KeyD: 'right',
   ArrowRight: 'right',
+  Space: 'jump',
   ShiftLeft: 'run',
   ShiftRight: 'run'
 };
@@ -20,13 +21,23 @@ const KEY_MAP = {
  * Keyboard always reports full magnitude (cardinal or normalized diagonal);
  * only the touch joystick actually uses in-between values.
  */
-export function createInputController() {
+export function createInputController(keyBindings = null) {
   const state = {
     moveX: 0,
     moveZ: 0,
     jump: false,
     run: false
   };
+
+  const currentKeyMap = { ...DEFAULT_KEY_MAP };
+  if (keyBindings) {
+    if (keyBindings.forward) currentKeyMap[keyBindings.forward] = 'forward';
+    if (keyBindings.backward) currentKeyMap[keyBindings.backward] = 'backward';
+    if (keyBindings.left) currentKeyMap[keyBindings.left] = 'left';
+    if (keyBindings.right) currentKeyMap[keyBindings.right] = 'right';
+    if (keyBindings.jump) currentKeyMap[keyBindings.jump] = 'jump';
+    if (keyBindings.run) currentKeyMap[keyBindings.run] = 'run';
+  }
 
   // Raw WASD/arrow key state, used only to recompute moveX/moveZ.
   const keys = { forward: false, backward: false, left: false, right: false };
@@ -40,7 +51,7 @@ export function createInputController() {
   }
 
   function onKeyDown(event) {
-    const action = KEY_MAP[event.code];
+    const action = currentKeyMap[event.code];
     if (!action) return;
     if (action === 'jump') state.jump = true;
     else if (action === 'run') state.run = true;
@@ -51,7 +62,7 @@ export function createInputController() {
   }
 
   function onKeyUp(event) {
-    const action = KEY_MAP[event.code];
+    const action = currentKeyMap[event.code];
     if (!action) return;
     if (action === 'jump') state.jump = false;
     else if (action === 'run') state.run = false;
