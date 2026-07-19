@@ -521,6 +521,9 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   } else {
     // If we have BVH, trust the collision flag
     player.isGrounded = isCollidingWithFloor;
+    if (player.isGrounded && velocity.y < 0) {
+      velocity.y = 0;
+    }
   }
 
   // --- 5. Fallback safety net ------------------------------------------------

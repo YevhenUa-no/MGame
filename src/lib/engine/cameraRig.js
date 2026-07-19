@@ -103,6 +103,8 @@ export function createCameraRig(camera, domElement, config = {}) {
         _currentLookAt.copy(_idealLookAt);
         initialized = true;
       } else {
+        // Use a frame-rate independent lerp that precisely matches a fixed `smoothing` value applied per 60hz frame.
+        // If finalConfig.follow.smoothing is 0.15, this behaves exactly like lerp(0.15) at 60fps, but smoothly scales for 144hz etc.
         const t = 1 - Math.pow(1 - finalConfig.follow.smoothing, deltaTime * 60);
         currentPosition.lerp(_idealOffset, t);
         _currentLookAt.lerp(_idealLookAt, 1 - Math.exp(-5 * deltaTime));
