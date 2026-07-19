@@ -51,6 +51,9 @@ export function createInputController(keyBindings = null) {
   }
 
   function onKeyDown(event) {
+    if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) {
+      event.preventDefault();
+    }
     const action = currentKeyMap[event.code];
     if (!action) return;
     if (action === 'jump') state.jump = true;
