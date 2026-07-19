@@ -35,6 +35,7 @@ export function createTouchControls(inputState) {
       </div>
     </div>
     <div class="touch-action-buttons">
+      <button type="button" class="touch-btn jump-btn" aria-label="Tap to jump">JUMP</button>
       <button type="button" class="touch-btn run-btn" aria-label="Hold to run">RUN</button>
     </div>
   `;
@@ -44,6 +45,7 @@ export function createTouchControls(inputState) {
   const base = root.querySelector('.joystick-base');
   const knob = root.querySelector('.joystick-knob');
   const runBtn = root.querySelector('.run-btn');
+  const jumpBtn = root.querySelector('.jump-btn');
 
   let activeTouchId = null;
   let originX = 0;
@@ -130,10 +132,12 @@ export function createTouchControls(inputState) {
   }
 
   bindHoldButton(runBtn, 'run');
+  bindHoldButton(jumpBtn, 'jump');
 
   function dispose() {
     resetJoystick();
     inputState.run = false;
+    inputState.jump = false;
     root.remove();
   }
 
