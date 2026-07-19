@@ -300,7 +300,7 @@ export const DEFAULT_ANIMATION = {
 export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, animationConfig = {}) {
   if (!mesh.userData || !mesh.userData.pivot) return;
   const config = { ...DEFAULT_ANIMATION, ...animationConfig };
-  const { pivot, leftLegPivot, rightLegPivot, leftArmPivot, rightArmPivot, head, torso, leftEye, rightEye, hatGroup } = mesh.userData;
+  const { pivot, leftLegPivot, rightLegPivot, leftArmPivot, rightArmPivot, head, torso, leftEye, rightEye, hatGroup, backpack, sleepingBag } = mesh.userData;
 
   mesh.userData.animationTime = (mesh.userData.animationTime || 0) + deltaTime;
   const time = mesh.userData.animationTime;
