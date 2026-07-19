@@ -107,6 +107,7 @@ export function buildWorld(scene) {
     group.add(object);
     
     // Support compound objects like trees/lampposts by traversing all nested meshes
+    object.updateMatrixWorld(true);
     object.traverse((child) => {
       if (child.isMesh && child.geometry) {
         collidableGeometries.push(prepForMerge(child.geometry, child));
