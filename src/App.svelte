@@ -34,7 +34,7 @@
       offsetZ: 3.782159877387497,
       smoothing: 0.15,
       autoAlign: true,
-      autoAlignForce: 2
+      autoAlignForce: 7.4
     },
     free: {
       position: [10, 8, 10],
