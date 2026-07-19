@@ -13,9 +13,9 @@
       jump: 'Space',
       run: 'ShiftLeft'
     },
-    moveSpeed: 5,
+    moveSpeed: 4.6,
     sprintMultiplier: 1.8,
-    turnSpeed: 12,
+    turnSpeed: 6.5,
     enableGravity: true,
     gravity: -10,
     jumpForce: 8,
