@@ -58,11 +58,11 @@
 
   const animationConfig = {
     enableWalkAnim: true,
-    walkAnimSpeed: 8,
-    walkAnimAmplitude: 0.55,
+    walkAnimSpeed: 10,
+    walkAnimAmplitude: 0.12,
     enableIdleBob: true,
-    idleBobSpeed: 1.6,
-    idleBobAmplitude: 0.02
+    idleBobSpeed: 2,
+    idleBobAmplitude: 0.03
   };
 
   let canvasEl;
