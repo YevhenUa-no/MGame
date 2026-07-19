@@ -309,25 +309,77 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, anim
   const isMoving = horizontalSpeed > 0.1;
   const speedFactor = horizontalSpeed > 6 ? 1.4 : 1;
 
-  if (config.enableWalkAnim && isMoving && isGrounded) {
+  if (!isGrounded) {
+      // JUMP / FALL STATE
+      // Arms thrown up and slightly out
+      leftArmPivot.rotation.x += (Math.PI * 0.7 - leftArmPivot.rotation.x) * t;
+      rightArmPivot.rotation.x += (Math.PI * 0.7 - rightArmPivot.rotation.x) * t;
+      leftArmPivot.rotation.z += (0.5 - leftArmPivot.rotation.z) * t;
+      rightArmPivot.rotation.z += (-0.5 - rightArmPivot.rotation.z) * t;
+      
+      // Legs split (Mario style jump)
+      leftLegPivot.rotation.x += (-0.4 - leftLegPivot.rotation.x) * t;
+      rightLegPivot.rotation.x += (0.2 - rightLegPivot.rotation.x) * t;
+      leftLegPivot.rotation.z += (0.1 - leftLegPivot.rotation.z) * t;
+      rightLegPivot.rotation.z += (-0.1 - rightLegPivot.rotation.z) * t;
+
+      // Lean slightly into the jump if moving
+      const targetLean = isMoving ? 0.15 : 0;
+      pivot.rotation.x += (targetLean - pivot.rotation.x) * t;
+
+      // Snap body parts back to resting Y (no bobbing in air)
+      torso.position.y += (-0.1 - torso.position.y) * t;
+      head.position.y += (0.28 - head.position.y) * t;
+      leftEye.position.y += (0.3 - leftEye.position.y) * t;
+      rightEye.position.y += (0.3 - rightEye.position.y) * t;
+      hatGroup.position.y += (0.44 - hatGroup.position.y) * t;
+      leftArmPivot.position.y += (0.08 - leftArmPivot.position.y) * t;
+      rightArmPivot.position.y += (0.08 - rightArmPivot.position.y) * t;
+      backpack.position.y += (-0.1 - backpack.position.y) * t;
+      sleepingBag.position.y += (0.11 - sleepingBag.position.y) * t;
+
+  } else if (config.enableWalkAnim && isMoving) {
+      // WALK / RUN STATE
       const swing = Math.sin(time * config.walkAnimSpeed * speedFactor) * config.walkAnimAmplitude;
       leftArmPivot.rotation.x = swing;
       rightArmPivot.rotation.x = -swing;
       leftLegPivot.rotation.x = -swing;
       rightLegPivot.rotation.x = swing;
+
+      leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
+      rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
+      leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
+      rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
+
+      pivot.rotation.x += (0 - pivot.rotation.x) * t;
+
+      // Slight body bounce from walking
+      const walkBounce = Math.abs(Math.sin(time * config.walkAnimSpeed * speedFactor)) * 0.05;
+      torso.position.y += (-0.1 + walkBounce - torso.position.y) * t;
+      head.position.y += (0.28 + walkBounce - head.position.y) * t;
+      leftEye.position.y += (0.3 + walkBounce - leftEye.position.y) * t;
+      rightEye.position.y += (0.3 + walkBounce - rightEye.position.y) * t;
+      hatGroup.position.y += (0.44 + walkBounce - hatGroup.position.y) * t;
+      leftArmPivot.position.y += (0.08 + walkBounce - leftArmPivot.position.y) * t;
+      rightArmPivot.position.y += (0.08 + walkBounce - rightArmPivot.position.y) * t;
+      backpack.position.y += (-0.1 + walkBounce - backpack.position.y) * t;
+      sleepingBag.position.y += (0.11 + walkBounce - sleepingBag.position.y) * t;
+
   } else {
+      // IDLE STATE
       leftArmPivot.rotation.x += (0 - leftArmPivot.rotation.x) * t;
       rightArmPivot.rotation.x += (0 - rightArmPivot.rotation.x) * t;
       leftLegPivot.rotation.x += (0 - leftLegPivot.rotation.x) * t;
       rightLegPivot.rotation.x += (0 - rightLegPivot.rotation.x) * t;
-  }
 
-  leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
-  rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
+      leftArmPivot.rotation.z += (0.08 - leftArmPivot.rotation.z) * t;
+      rightArmPivot.rotation.z += (-0.08 - rightArmPivot.rotation.z) * t;
+      leftLegPivot.rotation.z += (0 - leftLegPivot.rotation.z) * t;
+      rightLegPivot.rotation.z += (0 - rightLegPivot.rotation.z) * t;
 
-  if (config.enableIdleBob && isGrounded) {
-      const bobActive = !(config.enableWalkAnim && isMoving);
-      if (bobActive) {
+      pivot.rotation.x += (0 - pivot.rotation.x) * t;
+
+      if (config.enableIdleBob) {
           const bob = Math.sin(time * config.idleBobSpeed) * config.idleBobAmplitude;
           torso.position.y = -0.1 + bob;
           head.position.y = 0.28 + bob;
@@ -338,24 +390,17 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, anim
           rightArmPivot.position.y = 0.08 + bob;
           backpack.position.y = -0.1 + bob;
           sleepingBag.position.y = 0.11 + bob;
+      } else {
+          torso.position.y += (-0.1 - torso.position.y) * t;
+          head.position.y += (0.28 - head.position.y) * t;
+          leftEye.position.y += (0.3 - leftEye.position.y) * t;
+          rightEye.position.y += (0.3 - rightEye.position.y) * t;
+          hatGroup.position.y += (0.44 - hatGroup.position.y) * t;
+          leftArmPivot.position.y += (0.08 - leftArmPivot.position.y) * t;
+          rightArmPivot.position.y += (0.08 - rightArmPivot.position.y) * t;
+          backpack.position.y += (-0.1 - backpack.position.y) * t;
+          sleepingBag.position.y += (0.11 - sleepingBag.position.y) * t;
       }
-  } else {
-      torso.position.y += (-0.1 - torso.position.y) * t;
-      head.position.y += (0.28 - head.position.y) * t;
-      leftEye.position.y += (0.3 - leftEye.position.y) * t;
-      rightEye.position.y += (0.3 - rightEye.position.y) * t;
-      hatGroup.position.y += (0.44 - hatGroup.position.y) * t;
-      leftArmPivot.position.y += (0.08 - leftArmPivot.position.y) * t;
-      rightArmPivot.position.y += (0.08 - rightArmPivot.position.y) * t;
-      backpack.position.y += (-0.1 - backpack.position.y) * t;
-      sleepingBag.position.y += (0.11 - sleepingBag.position.y) * t;
-  }
-
-  if (!isGrounded) {
-      const targetLean = isMoving ? 0.12 : 0;
-      pivot.rotation.x += (targetLean - pivot.rotation.x) * t;
-  } else {
-      pivot.rotation.x += (0 - pivot.rotation.x) * t;
   }
 }
 
