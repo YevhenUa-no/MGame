@@ -129,6 +129,11 @@ export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoj
 export function resolveServerUrl() {
   const configured = import.meta.env?.VITE_MULTIPLAYER_URL;
   if (configured) return configured;
+  
+  if (window.location.hostname === 'cozy-explorer.vercel.app') {
+    return 'wss://mgame-production-4f64.up.railway.app';
+  }
+
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   return `${protocol}://${window.location.hostname}:8787`;
 }
