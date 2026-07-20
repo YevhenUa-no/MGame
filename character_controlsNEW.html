@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Character & Controls Tuner</title>
+<style>
+    body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+    canvas { display: block; }
+
+    #hud {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(30, 30, 30, 0.8);
+        color: #ccc;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-size: 13px;
+        line-height: 1.6;
+        pointer-events: none;
+        min-width: 210px;
+    }
+    #hud b { color: #fff; }
+    #hud .warn { color: #ffb74d; }
+
+    #controls-hint {
+        position: absolute;
+        top: 20px;
+        left: 260px;
+        background: rgba(30, 30, 30, 0.65);
+        color: #999;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-size: 12px;
+        line-height: 1.6;
+        pointer-events: none;
+    }
+
+    #pip-frame {
+        position: absolute;
+        display: none;
+        border: 2px solid rgba(255,255,255,0.45);
+        border-radius: 6px;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+        pointer-events: none;
+        box-sizing: border-box;
+    }
+    #pip-frame .pip-label {
+        position: absolute;
+        top: -23px;
+        left: -2px;
+        background: rgba(30, 30, 30, 0.85);
+        color: #ccc;
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 4px 4px 0 0;
+        white-space: nowrap;
+    }
+
+    #toolbar {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        gap: 10px;
+    }
+    .toolbar-btn {
+        padding: 10px 20px;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    #export-btn { background: #4caf50; }
+    #export-btn:hover { background: #45a049; }
+    #import-btn { background: #2196f3; }
+    #import-btn:hover { background: #1e88e5; }
+    #respawn-btn { background: #757575; }
+    #respawn-btn:hover { background: #616161; }
+
+    .overlay {
+        display: none;
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%; height: 80%;
+        background: rgba(30, 30, 30, 0.97);
+        padding: 20px;
+        border-radius: 8px;
+        color: #ddd;
+        flex-direction: column;
+        z-index: 10;
+    }
+    .overlay textarea {
+        flex: 1;
+        width: 100%;
+        background: #111;
+        color: #4caf50;
+        border: 1px solid #444;
+        font-family: monospace;
+        font-size: 13px;
+        padding: 10px;
+        margin-top: 10px;
+        box-sizing: border-box;
+        resize: none;
+    }
+    .overlay-header { display: flex; justify-content: space-between; align-items: center; }
+    .overlay-actions { display: flex; gap: 8px; }
+    .overlay-actions button {
+        padding: 6px 14px; border: none; cursor: pointer; border-radius: 4px; color: white; font-size: 14px;
+    }
+    .btn-close { background: #e53935; }
+    .btn-copy { background: #4caf50; }
+    .btn-load { background: #2196f3; }
+    #import-status { margin-top: 8px; font-size: 13px; min-height: 18px; }
+    #import-status.error { color: #ff6b6b; }
+    #import-status.success { color: #69f0ae; }
+</style>
+</head>
+<body>
+
+<div id="hud">
+    Position: <b id="hud-pos">0.00, 0.00, 0.00</b><br>
+    Grounded: <b id="hud-grounded">yes</b><br>
+    Vertical speed: <b id="hud-vspeed">0.00</b><br>
+    Camera mode: <b id="hud-cam">follow</b><br>
+    Obstacles: <b id="hud-obstacles">0</b><br>
+    <span id="hud-engine-warning" class="warn" style="display:none">Project engine modules not found — using fallback scene.</span>
+</div>
+
+<div id="controls-hint">
+    WASD / Arrows — move<br>
+    Space — jump (Gravity off: fly up)<br>
+    Shift — sprint (Gravity off: fly down)<br>
+    Mouse drag — orbit camera (Free mode only)
+</div>
+
+<div id="pip-frame"><span class="pip-label">Follow camera preview</span></div>
+
+<div id="toolbar">
+    <button id="export-btn" class="toolbar-btn">Export Config</button>
+    <button id="import-btn" class="toolbar-btn">Import Config</button>
+    <button id="respawn-btn" class="toolbar-btn">Respawn</button>
+</div>
+
+<div id="export-overlay" class="overlay">
+    <div class="overlay-header">
+        <h3 style="margin:0">Copy this into your character / camera config</h3>
+        <div class="overlay-actions">
+            <button class="btn-copy" id="copy-btn">Copy</button>
+            <button class="btn-close" id="close-export-btn">Close</button>
+        </div>
+    </div>
+    <textarea id="code-output" readonly></textarea>
+</div>
+
+<div id="import-overlay" class="overlay">
+    <div class="overlay-header">
+        <h3 style="margin:0">Paste a characterConfig / cameraConfig object to load it</h3>
+        <div class="overlay-actions">
+            <button class="btn-load" id="load-btn">Load</button>
+            <button class="btn-close" id="close-import-btn">Close</button>
+        </div>
+    </div>
+    <textarea id="code-input" placeholder="const characterConfig = { startPosition: [0,0,0], moveSpeed: 5, ... };&#10;const cameraConfig = { mode: 'follow', follow: { distance: 6, height: 3, smoothing: 0.15 }, free: { position: [10,8,10], lookAtCharacter: true } };"></textarea>
+    <div id="import-status"></div>
+</div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import GUI from 'https://esm.sh/lil-gui';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TransformControls } from 'three/addons/controls/TransformControls.js';
+    import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+    import { MeshBVH, computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'https://esm.sh/three-mesh-bvh';
+    import { createPlayer, updatePlayer, animateAvatar, DEFAULT_PHYSICS_CONFIG } from './src/lib/engine/player.js';
+
+    // Same BVH prototype patch world.js uses, so any collider mesh we build
+    // here (real or fallback) is shapecast-able exactly the way
+    // updatePlayer() in player.js expects.
+    THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+    THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+    THREE.Mesh.prototype.raycast = acceleratedRaycast;
+
+    // -----------------------------------------------------------------
+    // ENGINE HOOKUP — reuses the project's own scene/ground/lighting
+    // when the modules are reachable at these paths. If they aren't
+    // (e.g. this file is opened standalone, or the paths differ in your
+    // project), we fall back to a minimal built-in scene so the tool
+    // still works for tuning character/camera feel in isolation.
+    // Swap the paths below if your engine modules live elsewhere.
+    // -----------------------------------------------------------------
+    let scene, camera, renderer;
+    let usingFallbackScene = false;
+    // Everything the character can collide with lives here. In the real
+    // engine path this is exactly the group returned by buildWorld(), so
+    // collision automatically covers whatever obstacles world.js defines
+    // (crates, walls, rocks, ...) without this file needing to know their
+    // shapes — we only ever read their bounding boxes, generically.
+    let environmentGroup = null;
+    let worldCollider = null;
+    let worldBvhHelper = null;
+    // Stand-in passed to updatePlayer() when collisions are toggled off —
+    // no boundsTree means it takes the same "no collider" fallback path
+    // player.js itself uses when a level has no collider yet.
+    const noCollider = { geometry: {} };
+
+    // Builds a single merged-geometry BVH collider from the fallback demo
+    // scene's ground + obstacles, so updatePlayer() gets a real
+    // boundsTree to collide against even when the project's own world.js
+    // isn't reachable — same collision code path either way.
+    function buildFallbackCollider(obstacleGroup, groundMesh) {
+        const geometries = [];
+        const collect = (obj) => {
+            obj.updateWorldMatrix(true, false);
+            if (obj.isMesh && obj.geometry) {
+                const geo = obj.geometry.index ? obj.geometry.toNonIndexed() : obj.geometry.clone();
+                ['normal', 'uv', 'color'].forEach(attr => { if (geo.getAttribute(attr)) geo.deleteAttribute(attr); });
+                geo.applyMatrix4(obj.matrixWorld);
+                geometries.push(geo);
+            }
+        };
+        if (groundMesh) collect(groundMesh);
+        obstacleGroup.children.forEach(collect);
+        if (geometries.length === 0) return null;
+
+        const merged = mergeGeometries(geometries, false);
+        merged.computeBoundsTree();
+        const colliderMesh = new THREE.Mesh(merged, new THREE.MeshBasicMaterial({ visible: false }));
+        colliderMesh.visible = false;
+        scene.add(colliderMesh);
+        return colliderMesh;
+    }
+
+    async function setupScene() {
+        const canvas = document.createElement('canvas');
+        document.body.insertBefore(canvas, document.body.firstChild);
+
+        try {
+            const core = await import('./src/lib/engine/core.js');
+            const world = await import('./src/lib/engine/world.js');
+            const lighting = await import('./src/lib/engine/lighting.js');
+
+            const built = core.createCore(canvas);
+            scene = built.scene; camera = built.camera; renderer = built.renderer;
+            lighting.buildLighting(scene);
+            const { group, collider, bvhHelper } = world.buildWorld(scene); // real level, real obstacles
+            environmentGroup = group;
+            worldCollider = collider;
+            worldBvhHelper = bvhHelper;
+        } catch (err) {
+            console.warn('Project engine modules not found — using a standalone fallback scene.', err);
+            usingFallbackScene = true;
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+
+            const hemi = new THREE.HemisphereLight(0xffffff, 0x33334d, 1.1);
+            scene.add(hemi);
+            const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+            dir.position.set(15, 25, 10);
+            scene.add(dir);
+
+            const ground = new THREE.Mesh(
+                new THREE.PlaneGeometry(300, 300),
+                new THREE.MeshStandardMaterial({ color: 0x2e7d32 })
+            );
+            ground.rotation.x = -Math.PI / 2;
+            scene.add(ground);
+            scene.add(new THREE.GridHelper(300, 60, 0x555555, 0x333333));
+
+            // Placeholder obstacles so collision is testable even without
+            // the project's real world.js — swap for the real thing once
+            // this runs inside your app.
+            environmentGroup = new THREE.Group();
+            scene.add(environmentGroup);
+            const demoMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+            const crateGeo = new THREE.BoxGeometry(1.1, 1.1, 1.1);
+            const demoLayout = [
+                { geo: crateGeo, pos: [4, 0.55, 0] },
+                { geo: crateGeo, pos: [4, 0.55, 1.3] },
+                { geo: new THREE.BoxGeometry(4, 1.4, 0.4), pos: [-5, 0.7, 0] },
+                { geo: new THREE.CylinderGeometry(0.5, 0.5, 1.0, 12), pos: [0, 0.5, 5] },
+            ];
+            demoLayout.forEach(({ geo, pos }) => {
+                const mesh = new THREE.Mesh(geo, demoMat);
+                mesh.position.set(...pos);
+                environmentGroup.add(mesh);
+            });
+
+            // Real BVH collider (not just AABBs) so updatePlayer()'s
+            // capsule-vs-mesh collision behaves exactly as it will in
+            // production, even in this standalone fallback scene.
+            worldCollider = buildFallbackCollider(environmentGroup, ground);
+        }
+
+        document.getElementById('hud-engine-warning').style.display = usingFallbackScene ? 'block' : 'none';
+    }
+
+    await setupScene();
+
+    window.addEventListener('resize', () => {
+        const w = window.innerWidth, h = window.innerHeight;
+        if (camera.isPerspectiveCamera) {
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        }
+        renderer.setSize(w, h);
+    });
+
+    // -----------------------------------------------------------------
+    // CHARACTER — the real character/capsule from player.js
+    // (createPlayer), not a stand-in. Whatever this tuner shows is
+    // exactly what ships, including the walk/idle animation.
+    // -----------------------------------------------------------------
+    const PLAYER_START_POSITION = [0, 1.0, 4]; // matches createPlayer()'s startPosition fallback
+    const PLAYER_COLLISION_RADIUS = 0.35;      // matches createPlayer()'s collisionRadius fallback
+    const PLAYER_COLLISION_HEIGHT = 1.6;       // matches createPlayer()'s collisionHeight fallback
+
+    const player = createPlayer(scene, {
+        startPosition: PLAYER_START_POSITION,
+        collisionRadius: PLAYER_COLLISION_RADIUS,
+        collisionHeight: PLAYER_COLLISION_HEIGHT
+    }, {}, {});
+
+    // Rebuilds the capsule collision shape after the radius/height
+    // sliders change — createPlayer() only sizes this once at creation.
+    function rebuildCapsule() {
+        const radius = params.charRadius;
+        const cylinderLength = Math.max(0.01, params.charHeight - radius * 2);
+        player.capsuleInfo.radius = radius;
+        player.capsuleInfo.segment.start.set(0, radius, 0);
+        player.capsuleInfo.segment.end.set(0, cylinderLength + radius, 0);
+        player.height = cylinderLength + radius * 2;
+    }
+
+    // -----------------------------------------------------------------
+    // COLLISION DEBUG VISUALS — wireframe edges over every collidable
+    // mesh, plus a capsule outline over the character. Purely visual;
+    // the actual collision now runs through updatePlayer()'s own
+    // capsule-vs-BVH shapecast against worldCollider, same as production.
+    // -----------------------------------------------------------------
+    let collisionHelpers = null;
+
+    const charCollisionGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
+    const charCollisionMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true, transparent: true, opacity: 0.5 });
+    const charCollisionHelper = new THREE.Mesh(charCollisionGeo, charCollisionMat);
+    charCollisionHelper.visible = false;
+    scene.add(charCollisionHelper);
+
+    function rebuildCollisionBoxes() {
+        if (worldCollider) worldCollider.visible = false;
+        if (worldBvhHelper) worldBvhHelper.visible = false;
+
+        if (collisionHelpers) {
+            scene.remove(collisionHelpers);
+            collisionHelpers = null;
+        }
+        if (!environmentGroup) return;
+
+        collisionHelpers = new THREE.Group();
+        collisionHelpers.visible = params.showCollisionBoxes;
+        scene.add(collisionHelpers);
+
+        let obstacleCount = 0;
+        environmentGroup.children.forEach((obj) => {
+            obstacleCount++;
+            // Skip drawing massive ground plane diagonals
+            if (obj.geometry && obj.geometry.type === 'PlaneGeometry') return;
+
+            obj.traverse((child) => {
+                if (child.isMesh && child.geometry && child.geometry.type !== 'PlaneGeometry') {
+                    const edges = new THREE.EdgesGeometry(child.geometry);
+                    const lines = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x00ff00 }));
+                    lines.matrixAutoUpdate = false;
+                    lines.matrix.copy(child.matrixWorld);
+                    collisionHelpers.add(lines);
+                }
+            });
+        });
+
+        document.getElementById('hud-obstacles').textContent = worldCollider ? 'BVH' : obstacleCount;
+    }
+
+    // -----------------------------------------------------------------
+    // PARAMETERS — every one of these is live: the physics/camera loop
+    // below reads straight from this object every frame, so dragging a
+    // slider changes behavior immediately, no "apply" step needed.
+    // Physics/movement defaults are read directly from player.js's
+    // DEFAULT_PHYSICS_CONFIG (imported at the top of this file) instead
+    // of being separately-chosen numbers that can drift out of sync.
+    // -----------------------------------------------------------------
+    const params = {
+        // Start / respawn — matches createPlayer()'s default startPosition
+        startX: PLAYER_START_POSITION[0], startY: PLAYER_START_POSITION[1], startZ: PLAYER_START_POSITION[2],
+
+        // Keybindings
+        keyForward: 'KeyW',
+        keyBackward: 'KeyS',
+        keyLeft: 'KeyA',
+        keyRight: 'KeyD',
+        keyJump: 'Space',
+        keySprint: 'ShiftLeft',
+
+        // Movement — moveSpeed/sprintMultiplier reproduce player.js's
+        // walkSpeed/runSpeed ratio; moveAccel/moveDamping match its
+        // velocity-based acceleration model exactly.
+        // Movement
+        moveSpeed: 4.6,
+        sprintMultiplier: 1.8,
+        turnSpeed: 6.5,
+        moveAccel: DEFAULT_PHYSICS_CONFIG.moveAccel,
+        moveDamping: DEFAULT_PHYSICS_CONFIG.moveDamping,
+
+        // Physics
+        enableGravity: DEFAULT_PHYSICS_CONFIG.enableGravity,
+        gravity: -10,
+        jumpForce: 8,
+        maxFallSpeed: -32,
+        groundY: 0,
+
+        // Camera
+        cameraMode: 'follow', // 'follow' | 'free'
+        followOffsetX: 0,
+        followOffsetY: 2.6548986885658583,
+        followOffsetZ: 3.782159877387497,
+        followSmoothing: 0.15,
+        autoAlign: true,
+        autoAlignForce: 7.4,
+        freeX: 10, freeY: 8, freeZ: 10,
+        freeLookAtChar: true,
+        showFollowPreview: true,
+
+        // Collision — matches createPlayer()'s collisionRadius/collisionHeight fallbacks
+        enableCollisions: true,
+        charRadius: PLAYER_COLLISION_RADIUS,
+        charHeight: PLAYER_COLLISION_HEIGHT,
+        showCollisionBoxes: false,
+        showCharCollision: false,
+    };
+
+    rebuildCapsule();
+
+    rebuildCollisionBoxes();
+
+    function respawn() {
+        player.mesh.position.set(params.startX, params.startY, params.startZ);
+        player.mesh.rotation.y = 0;
+        player.velocity.set(0, 0, 0);
+        player.isGrounded = true;
+    }
+    respawn();
+
+    // -----------------------------------------------------------------
+    // CAMERA — Follow: locked third-person chase cam computed from the
+    // character's facing direction, smoothed with a lerp. Free: normal
+    // OrbitControls you can drag around, plus explicit XYZ fields you
+    // can "snap" the camera to for reproducible framing.
+    // -----------------------------------------------------------------
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+
+    let guiCtrlOffsetX, guiCtrlOffsetY, guiCtrlOffsetZ;
+    const camVizGroup = new THREE.Group();
+    camVizGroup.visible = false;
+    scene.add(camVizGroup);
+
+    const dummyCamBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.4, 0.3, 0.4),
+        new THREE.MeshStandardMaterial({ color: 0x555555 })
+    );
+    const dummyCamLens = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.15, 0.3, 16),
+        new THREE.MeshStandardMaterial({ color: 0x111111 })
+    );
+    dummyCamLens.rotation.x = Math.PI / 2;
+    dummyCamLens.position.set(0, 0, -0.25);
+    const dummyCamMesh = new THREE.Group();
+    dummyCamMesh.add(dummyCamBody);
+    dummyCamMesh.add(dummyCamLens);
+    camVizGroup.add(dummyCamMesh);
+
+    const orbitLineMat = new THREE.LineBasicMaterial({ color: 0xcddc39 }); // lime/yellow
+    const orbitLineGeo = new THREE.BufferGeometry();
+    const orbitLine = new THREE.LineLoop(orbitLineGeo, orbitLineMat);
+    camVizGroup.add(orbitLine);
+
+    let cameraYaw = Math.PI;
+
+    const tControls = new TransformControls(camera, renderer.domElement);
+    tControls.attach(dummyCamMesh);
+    tControls.setMode('translate');
+    camVizGroup.add(tControls);
+
+    function updateOrbitVisuals() {
+        const pts = [];
+        const numPts = 64;
+        const radius = Math.hypot(params.followOffsetX, params.followOffsetZ);
+        
+        for(let i=0; i<numPts; i++) {
+            const th = (i / numPts) * Math.PI * 2;
+            pts.push(new THREE.Vector3(Math.sin(th) * radius, params.followOffsetY, Math.cos(th) * radius));
+        }
+        orbitLineGeo.setFromPoints(pts);
+        orbitLine.position.copy(player.mesh.position);
+
+        if (!tControls.dragging) {
+            const offset = new THREE.Vector3(params.followOffsetX, params.followOffsetY, params.followOffsetZ);
+            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+            dummyCamMesh.position.copy(player.mesh.position).add(offset);
+        }
+        
+        dummyCamMesh.lookAt(player.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
+    }
+
+    tControls.addEventListener('dragging-changed', (event) => {
+        orbit.enabled = !event.value && (params.cameraMode === 'free');
+    });
+
+    tControls.addEventListener('change', () => {
+        if (!tControls.dragging) return;
+        
+        const localPos = dummyCamMesh.position.clone().sub(player.mesh.position);
+        localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -cameraYaw);
+
+        params.followOffsetX = localPos.x;
+        params.followOffsetY = localPos.y;
+        params.followOffsetZ = localPos.z;
+        
+        if (guiCtrlOffsetX) guiCtrlOffsetX.updateDisplay();
+        if (guiCtrlOffsetY) guiCtrlOffsetY.updateDisplay();
+        if (guiCtrlOffsetZ) guiCtrlOffsetZ.updateDisplay();
+        
+        updateOrbitVisuals();
+    });
+
+    function applyCameraMode() {
+        orbit.enabled = (params.cameraMode === 'free');
+        if (camVizGroup) camVizGroup.visible = (params.cameraMode === 'free');
+        if (params.cameraMode === 'free') {
+            camera.position.set(params.freeX, params.freeY, params.freeZ);
+            if (params.freeLookAtChar) orbit.target.copy(player.mesh.position);
+            orbit.update();
+        }
+    }
+    applyCameraMode();
+
+    let isDraggingCam = false;
+    let lastPointerX = 0;
+
+    window.addEventListener('pointerdown', (e) => {
+        if (params.cameraMode !== 'follow') return;
+        isDraggingCam = true;
+        lastPointerX = e.clientX;
+    });
+    window.addEventListener('pointerup', () => { isDraggingCam = false; });
+    window.addEventListener('pointermove', (e) => {
+        if (params.cameraMode !== 'follow' || !isDraggingCam) return;
+        cameraYaw -= (e.clientX - lastPointerX) * 0.005;
+        lastPointerX = e.clientX;
+    });
+
+    const _idealOffset = new THREE.Vector3();
+    const _idealLookAt = new THREE.Vector3();
+
+    function updateFollowCamera(dt) {
+        _idealOffset
+            .set(params.followOffsetX, params.followOffsetY, params.followOffsetZ)
+            .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw)
+            .add(player.mesh.position);
+            
+        camera.position.lerp(_idealOffset, THREE.MathUtils.clamp(params.followSmoothing, 0.01, 1));
+        
+        _idealLookAt.copy(player.mesh.position).add(new THREE.Vector3(0, 1.2, 0));
+        camera.lookAt(_idealLookAt);
+    }
+
+    function updateFreeCamera() {
+        if (params.freeLookAtChar) orbit.target.copy(player.mesh.position);
+        orbit.update();
+    }
+
+    // -----------------------------------------------------------------
+    // INPUT
+    // -----------------------------------------------------------------
+    const keys = new Set();
+    function isTypingInField(e) {
+        const tag = e.target.tagName;
+        return tag === 'TEXTAREA' || tag === 'INPUT';
+    }
+    window.addEventListener('keydown', (e) => {
+        if (isTypingInField(e)) return;
+        keys.add(e.code);
+        if (e.code === params.keyJump) e.preventDefault();
+    });
+    window.addEventListener('keyup', (e) => { keys.delete(e.code); });
+
+    function smoothAngle(current, target, rate) {
+        let diff = target - current;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        const step = THREE.MathUtils.clamp(rate, 0, 1) * diff;
+        return current + step;
+    }
+
+    // -----------------------------------------------------------------
+    // MAIN LOOP
+    // -----------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function syncPlayerConfig() {
+        // Copy every tunable straight into player.config each frame, so
+        // GUI sliders drive the *actual* player.js physics rather than a
+        // parallel reimplementation of it.
+        Object.assign(player.config, {
+            moveSpeed: params.moveSpeed,
+            sprintMultiplier: params.sprintMultiplier,
+            turnSpeed: params.turnSpeed,
+            moveAccel: params.moveAccel,
+            moveDamping: params.moveDamping,
+            enableGravity: params.enableGravity,
+            gravity: params.gravity,
+            jumpForce: params.jumpForce,
+            maxFallSpeed: params.maxFallSpeed,
+            groundY: params.groundY
+        });
+    }
+
+    function updateCharacter(dt) {
+        let inputX = 0, inputZ = 0;
+        if (keys.has(params.keyForward) || keys.has('ArrowUp')) inputZ -= 1;
+        if (keys.has(params.keyBackward) || keys.has('ArrowDown')) inputZ += 1;
+        if (keys.has(params.keyLeft) || keys.has('ArrowLeft')) inputX -= 1;
+        if (keys.has(params.keyRight) || keys.has('ArrowRight')) inputX += 1;
+
+        const sprinting = keys.has(params.keySprint) || keys.has('ShiftRight');
+        const jumping = keys.has(params.keyJump);
+
+        syncPlayerConfig();
+
+        if (!params.enableGravity) {
+            // EDIT / FLY MODE — a tuner-only convenience, not part of
+            // player.js's own controller, for freely repositioning the
+            // character while gravity is off (Jump key flies up, Sprint
+            // flies down, ignores collisions). Turn gravity back on to
+            // return to the exact production movement via updatePlayer().
+            updateFlyMode(inputX, inputZ, sprinting, jumping, dt);
+            return;
+        }
+
+        // updatePlayer() wants raw (not camera-relative) input axes plus
+        // the camera's yaw — it does the camera-relative transform,
+        // gravity, jump, capsule-vs-BVH collision, grounding, and the
+        // walk/idle animation internally. This is the exact same call
+        // your production code makes each frame.
+        const collider = params.enableCollisions ? worldCollider : noCollider;
+        updatePlayer(
+            player,
+            collider || noCollider,
+            { moveX: inputX, moveZ: inputZ, jump: jumping, run: sprinting },
+            cameraYaw,
+            dt
+        );
+    }
+
+    function updateFlyMode(inputX, inputZ, sprinting, jumping, dt) {
+        const speed = params.moveSpeed * (sprinting ? params.sprintMultiplier : 1);
+        let horizontalSpeed = 0;
+
+        if (inputX !== 0 || inputZ !== 0) {
+            const len = Math.hypot(inputX, inputZ);
+            const nx = inputX / len, nz = inputZ / len;
+
+            const camForward = new THREE.Vector3();
+            camera.getWorldDirection(camForward);
+            camForward.y = 0;
+            if (camForward.lengthSq() < 1e-6) camForward.set(0, 0, -1);
+            camForward.normalize();
+            const camRight = new THREE.Vector3().crossVectors(camForward, new THREE.Vector3(0, 1, 0));
+
+            const moveDir = new THREE.Vector3()
+                .addScaledVector(camForward, -nz)
+                .addScaledVector(camRight, nx);
+            if (moveDir.lengthSq() > 1e-6) {
+                moveDir.normalize();
+                player.mesh.position.addScaledVector(moveDir, speed * dt);
+                horizontalSpeed = speed;
+                const targetYaw = Math.atan2(moveDir.x, moveDir.z);
+                player.mesh.rotation.y = smoothAngle(player.mesh.rotation.y, targetYaw, params.turnSpeed * dt);
+            }
+        }
+
+        let vertical = 0;
+        if (jumping) vertical += 1;
+        if (sprinting) vertical -= 1;
+        player.mesh.position.y += vertical * speed * dt;
+
+        player.velocity.set(0, 0, 0);
+        player.isGrounded = true;
+        animateAvatar(player.mesh, dt, true, horizontalSpeed, player.animationConfig);
+    }
+
+    function refreshHud() {
+        const p = player.mesh.position;
+        document.getElementById('hud-pos').textContent = `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}`;
+        document.getElementById('hud-grounded').textContent = player.isGrounded ? 'yes' : 'no';
+        document.getElementById('hud-vspeed').textContent = player.velocity.y.toFixed(2);
+        document.getElementById('hud-cam').textContent = params.cameraMode;
+    }
+
+    const pipCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
+    const pipFrameEl = document.getElementById('pip-frame');
+    const toolbarEl = document.getElementById('toolbar');
+    const _pipUp = new THREE.Vector3(0, 1, 0);
+    const _pipOffset = new THREE.Vector3();
+    const _pipLookAt = new THREE.Vector3();
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05); // clamp to avoid big jumps on tab-switch
+
+        updateCharacter(dt);
+
+        if (charCollisionHelper) {
+            charCollisionHelper.visible = params.showCharCollision;
+            if (params.showCharCollision) {
+                // CylinderGeometry is radius 1, height 1
+                charCollisionHelper.scale.set(params.charRadius, params.charHeight, params.charRadius);
+                charCollisionHelper.position.copy(player.mesh.position);
+                charCollisionHelper.position.y += params.charHeight / 2;
+            }
+        }
+
+        if (params.autoAlign && !isDraggingCam) {
+            cameraYaw = smoothAngle(cameraYaw, player.mesh.rotation.y + Math.PI, params.autoAlignForce * dt);
+        }
+
+        if (params.cameraMode === 'follow') {
+            updateFollowCamera(dt);
+        } else {
+            updateFreeCamera();
+            updateOrbitVisuals();
+        }
+
+        refreshHud();
+
+        // 1. Render Main Scene
+        renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        renderer.setScissorTest(false);
+        renderer.render(scene, camera);
+
+        // 2. Render Picture-in-Picture (PiP): an accurate preview of what
+        // the Follow camera would actually see. Only relevant in Free mode
+        // — in Follow mode the main view already *is* this shot.
+        //
+        // Important: the PiP camera's transform is computed directly from
+        // params.followOffset*/cameraYaw/player.mesh.position — the exact
+        // same formula updateFollowCamera() uses — instead of copying the
+        // gizmo mesh's transform. Deriving it independently like this
+        // guarantees the preview always faces the right way and can't
+        // drift out of sync with whatever the gizmo/TransformControls are
+        // doing to their own object graph.
+        const showPip = params.cameraMode === 'free' && params.showFollowPreview;
+        pipFrameEl.style.display = showPip ? 'block' : 'none';
+
+        if (showPip) {
+            const aspect = camera.isPerspectiveCamera ? camera.aspect : (window.innerWidth / window.innerHeight);
+            const pipWidth = Math.round(Math.min(window.innerWidth * 0.32, 420));
+            const pipHeight = Math.round((pipWidth / aspect) * 2); // twice as tall as a straight crop would be
+            const pipX = 20;
+            // Sit above the toolbar (measured live, so it adapts to its
+            // actual rendered height) instead of overlapping it.
+            const toolbarRect = toolbarEl.getBoundingClientRect();
+            const pipY = (window.innerHeight - toolbarRect.top) + 20; // WebGL viewport Y is measured from the bottom
+
+            // Hide tuning-only visuals just for this render so the PiP
+            // shows pure gameplay framing, not gizmos/wireframes.
+            const hiddenForPip = [camVizGroup, collisionHelpers, charCollisionHelper, worldBvhHelper, worldCollider].filter(Boolean);
+            const priorVisibility = hiddenForPip.map(o => o.visible);
+            hiddenForPip.forEach(o => { o.visible = false; });
+
+            _pipOffset
+                .set(params.followOffsetX, params.followOffsetY, params.followOffsetZ)
+                .applyAxisAngle(_pipUp, cameraYaw)
+                .add(player.mesh.position);
+            pipCamera.position.copy(_pipOffset);
+            pipCamera.up.set(0, 1, 0);
+            _pipLookAt.copy(player.mesh.position).add(new THREE.Vector3(0, 1.2, 0));
+            pipCamera.lookAt(_pipLookAt);
+
+            // Match the main camera's FOV so the lens is realistic; the
+            // aspect ratio uses the box's own (taller) dimensions rather
+            // than the main camera's, so the extra height reveals more of
+            // the scene instead of stretching the image.
+            if (camera.isPerspectiveCamera) {
+                pipCamera.fov = camera.fov;
+                pipCamera.near = camera.near;
+                pipCamera.far = camera.far;
+            }
+            pipCamera.aspect = pipWidth / pipHeight;
+            pipCamera.updateProjectionMatrix();
+
+            renderer.setViewport(pipX, pipY, pipWidth, pipHeight);
+            renderer.setScissor(pipX, pipY, pipWidth, pipHeight);
+            renderer.setScissorTest(true);
+            renderer.render(scene, pipCamera);
+            renderer.setScissorTest(false);
+
+            hiddenForPip.forEach((o, i) => { o.visible = priorVisibility[i]; });
+
+            // Keep the CSS border/label lined up with the WebGL viewport rect above.
+            pipFrameEl.style.left = pipX + 'px';
+            pipFrameEl.style.bottom = pipY + 'px';
+            pipFrameEl.style.width = pipWidth + 'px';
+            pipFrameEl.style.height = pipHeight + 'px';
+        }
+    }
+    animate();
+
+    // -----------------------------------------------------------------
+    // GUI — every tunable parameter as a live slider / checkbox / dropdown.
+    // -----------------------------------------------------------------
+    const gui = new GUI();
+
+    const keysFolder = gui.addFolder('Key Bindings');
+    keysFolder.add(params, 'keyForward').name('Forward');
+    keysFolder.add(params, 'keyBackward').name('Backward');
+    keysFolder.add(params, 'keyLeft').name('Left');
+    keysFolder.add(params, 'keyRight').name('Right');
+    keysFolder.add(params, 'keyJump').name('Jump');
+    keysFolder.add(params, 'keySprint').name('Sprint');
+
+    const startFolder = gui.addFolder('Start Position');
+    startFolder.add(params, 'startX', -50, 50, 0.5).name('Start X');
+    startFolder.add(params, 'startY', -10, 20, 0.5).name('Start Y');
+    startFolder.add(params, 'startZ', -50, 50, 0.5).name('Start Z');
+    startFolder.add({ respawn }, 'respawn').name('Respawn Here');
+
+    const moveFolder = gui.addFolder('Movement');
+    moveFolder.add(params, 'moveSpeed', 0.5, 20, 0.1).name('Move Speed');
+    moveFolder.add(params, 'sprintMultiplier', 1, 4, 0.1).name('Sprint x (Shift)');
+    moveFolder.add(params, 'turnSpeed', 1, 30, 0.5).name('Turn Speed');
+    moveFolder.add(params, 'moveAccel', 1, 100, 1).name('Move Accel');
+    moveFolder.add(params, 'moveDamping', 0.5, 30, 0.5).name('Move Damping');
+
+    const physicsFolder = gui.addFolder('Physics');
+    physicsFolder.add(params, 'enableGravity').name('Enable Gravity').onChange(() => { player.velocity.set(0, 0, 0); });
+    physicsFolder.add(params, 'gravity', -60, -1, 0.5).name('Gravity');
+    physicsFolder.add(params, 'jumpForce', 0, 25, 0.5).name('Jump Force');
+    physicsFolder.add(params, 'maxFallSpeed', -80, -5, 1).name('Max Fall Speed');
+    physicsFolder.add(params, 'groundY', -10, 10, 0.1).name('Ground Y');
+
+    const collisionFolder = gui.addFolder('Collision');
+    collisionFolder.add(params, 'enableCollisions').name('Enable Collisions');
+    collisionFolder.add(params, 'charRadius', 0.1, 2, 0.05).name('Character Radius').onChange(rebuildCapsule);
+    collisionFolder.add(params, 'charHeight', 0.5, 3, 0.05).name('Character Height').onChange(rebuildCapsule);
+    collisionFolder.add(params, 'showCollisionBoxes').name('Show World Collisions').onChange(v => {
+        if (worldCollider) {
+            worldCollider.visible = v;
+        } else if (collisionHelpers) {
+            collisionHelpers.visible = v;
+        }
+    });
+    collisionFolder.add(params, 'showCharCollision').name('Show Char Collision');
+    collisionFolder.add({ rebuild: rebuildCollisionBoxes }, 'rebuild').name('Rebuild From World');
+
+    const camFolder = gui.addFolder('Camera');
+    camFolder.add(params, 'cameraMode', ['follow', 'free']).name('Mode').onChange(applyCameraMode);
+
+    const followFolder = camFolder.addFolder('Follow settings');
+    followFolder.add(params, 'showFollowPreview').name('Show Preview (PiP)');
+    guiCtrlOffsetX = followFolder.add(params, 'followOffsetX', -20, 20, 0.5).name('Offset X');
+    guiCtrlOffsetY = followFolder.add(params, 'followOffsetY', -20, 20, 0.5).name('Offset Y');
+    guiCtrlOffsetZ = followFolder.add(params, 'followOffsetZ', -20, 20, 0.5).name('Offset Z');
+    followFolder.add(params, 'followSmoothing', 0.01, 1, 0.01).name('Smoothing');
+    followFolder.add(params, 'autoAlign').name('Auto Align');
+    followFolder.add(params, 'autoAlignForce', 0.1, 10, 0.1).name('Auto Align Force');
+
+    const freeFolder = camFolder.addFolder('Free settings');
+    freeFolder.add(params, 'freeX', -100, 100, 0.5).name('Position X');
+    freeFolder.add(params, 'freeY', -20, 100, 0.5).name('Position Y');
+    freeFolder.add(params, 'freeZ', -100, 100, 0.5).name('Position Z');
+    freeFolder.add({ snap: () => { camera.position.set(params.freeX, params.freeY, params.freeZ); orbit.update(); } }, 'snap').name('Snap Camera Here');
+    freeFolder.add(params, 'freeLookAtChar').name('Look At Character');
+
+    // -----------------------------------------------------------------
+    // EXPORT / IMPORT
+    // -----------------------------------------------------------------
+    const exportOverlay = document.getElementById('export-overlay');
+    const importOverlay = document.getElementById('import-overlay');
+
+    function buildExportCode() {
+        const p = player.mesh.position;
+        return `  // Character controller config — generated by the Character & Controls Tuner.
+  // Keys match player.js's createPlayer()/updatePlayer() config exactly —
+  // paste this straight in, no renaming needed.
+  const characterConfig = {
+    startPosition: [${params.startX.toFixed(2)}, ${params.startY.toFixed(2)}, ${params.startZ.toFixed(2)}],
+    keyBindings: {
+      forward: '${params.keyForward}',
+      backward: '${params.keyBackward}',
+      left: '${params.keyLeft}',
+      right: '${params.keyRight}',
+      jump: '${params.keyJump}',
+      run: '${params.keySprint}'
+    },
+    moveSpeed: ${params.moveSpeed},
+    sprintMultiplier: ${params.sprintMultiplier},
+    turnSpeed: ${params.turnSpeed},
+    moveAccel: ${params.moveAccel},
+    moveDamping: ${params.moveDamping},
+    enableGravity: ${params.enableGravity},
+    gravity: ${params.gravity},
+    jumpForce: ${params.jumpForce},
+    maxFallSpeed: ${params.maxFallSpeed},
+    groundY: ${params.groundY},
+    collisionRadius: ${params.charRadius},
+    collisionHeight: ${params.charHeight}
+    // enableCollisions (${params.enableCollisions}) is a tuner-only preview
+    // toggle — player.js always collides against whatever collider you pass in.
+  };
+
+  const cameraConfig = {
+    mode: '${params.cameraMode}',
+    follow: {
+      offsetX: ${params.followOffsetX},
+      offsetY: ${params.followOffsetY},
+      offsetZ: ${params.followOffsetZ},
+      smoothing: ${params.followSmoothing},
+      autoAlign: ${params.autoAlign},
+      autoAlignForce: ${params.autoAlignForce}
+    },
+    free: {
+      position: [${params.freeX}, ${params.freeY}, ${params.freeZ}],
+      lookAtCharacter: ${params.freeLookAtChar}
+    }
+  };
+
+  // Character position at time of export: [${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${p.z.toFixed(2)}]`;
+    }
+
+    document.getElementById('export-btn').addEventListener('click', () => {
+        document.getElementById('code-output').value = buildExportCode();
+        exportOverlay.style.display = 'flex';
+    });
+    document.getElementById('close-export-btn').addEventListener('click', () => {
+        exportOverlay.style.display = 'none';
+    });
+    document.getElementById('copy-btn').addEventListener('click', async () => {
+        const output = document.getElementById('code-output');
+        output.select();
+        try {
+            await navigator.clipboard.writeText(output.value);
+            const btn = document.getElementById('copy-btn');
+            const original = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        } catch (err) {
+            console.warn('Clipboard copy failed, text is selected for manual copy:', err);
+        }
+    });
+
+    function parseConfigObjects(text) {
+        const extract = (name) => {
+            const re = new RegExp(name + '\\s*=\\s*(\\{[\\s\\S]*?\\n\\s*\\};?)', 'm');
+            const m = text.match(re);
+            if (!m) return null;
+            const literal = m[1].replace(/;\s*$/, '');
+            return Function('"use strict"; return (' + literal + ');')();
+        };
+        const characterConfig = extract('characterConfig');
+        const cameraConfig = extract('cameraConfig');
+        if (!characterConfig && !cameraConfig) {
+            throw new Error('Could not find a characterConfig or cameraConfig object in the pasted text.');
+        }
+        return { characterConfig, cameraConfig };
+    }
+
+    function applyImportedConfig(cfg) {
+        const c = cfg.characterConfig;
+        if (c) {
+            if (c.keyBindings) {
+                params.keyForward = c.keyBindings.forward || params.keyForward;
+                params.keyBackward = c.keyBindings.backward || params.keyBackward;
+                params.keyLeft = c.keyBindings.left || params.keyLeft;
+                params.keyRight = c.keyBindings.right || params.keyRight;
+                params.keyJump = c.keyBindings.jump || params.keyJump;
+                params.keySprint = c.keyBindings.run || params.keySprint;
+            }
+            if (Array.isArray(c.startPosition)) {
+                [params.startX, params.startY, params.startZ] = c.startPosition;
+            }
+            if (typeof c.moveSpeed === 'number') params.moveSpeed = c.moveSpeed;
+            if (typeof c.sprintMultiplier === 'number') params.sprintMultiplier = c.sprintMultiplier;
+            if (typeof c.turnSpeed === 'number') params.turnSpeed = c.turnSpeed;
+            if (typeof c.moveAccel === 'number') params.moveAccel = c.moveAccel;
+            if (typeof c.moveDamping === 'number') params.moveDamping = c.moveDamping;
+            if (typeof c.enableGravity === 'boolean') params.enableGravity = c.enableGravity;
+            if (typeof c.gravity === 'number') params.gravity = c.gravity;
+            if (typeof c.jumpForce === 'number') params.jumpForce = c.jumpForce;
+            if (typeof c.maxFallSpeed === 'number') params.maxFallSpeed = c.maxFallSpeed;
+            if (typeof c.groundY === 'number') params.groundY = c.groundY;
+            if (typeof c.enableCollisions === 'boolean') params.enableCollisions = c.enableCollisions;
+            if (typeof c.collisionRadius === 'number') params.charRadius = c.collisionRadius;
+            if (typeof c.collisionHeight === 'number') params.charHeight = c.collisionHeight;
+        }
+        const cam = cfg.cameraConfig;
+        if (cam) {
+            if (cam.mode === 'follow' || cam.mode === 'free') params.cameraMode = cam.mode;
+            if (cam.follow) {
+                if (typeof cam.follow.offsetX === 'number') params.followOffsetX = cam.follow.offsetX;
+                if (typeof cam.follow.offsetY === 'number') params.followOffsetY = cam.follow.offsetY;
+                if (typeof cam.follow.offsetZ === 'number') params.followOffsetZ = cam.follow.offsetZ;
+                if (typeof cam.follow.smoothing === 'number') params.followSmoothing = cam.follow.smoothing;
+                if (typeof cam.follow.autoAlign === 'boolean') params.autoAlign = cam.follow.autoAlign;
+                if (typeof cam.follow.autoAlignForce === 'number') params.autoAlignForce = cam.follow.autoAlignForce;
+            }
+            if (cam.free) {
+                if (Array.isArray(cam.free.position)) [params.freeX, params.freeY, params.freeZ] = cam.free.position;
+                if (typeof cam.free.lookAtCharacter === 'boolean') params.freeLookAtChar = cam.free.lookAtCharacter;
+            }
+        }
+        gui.controllersRecursive().forEach(ctrl => ctrl.updateDisplay());
+        rebuildCapsule();
+        applyCameraMode();
+        respawn();
+    }
+
+    document.getElementById('import-btn').addEventListener('click', () => {
+        document.getElementById('import-status').textContent = '';
+        document.getElementById('import-status').className = '';
+        importOverlay.style.display = 'flex';
+    });
+    document.getElementById('close-import-btn').addEventListener('click', () => {
+        importOverlay.style.display = 'none';
+    });
+    document.getElementById('load-btn').addEventListener('click', () => {
+        const text = document.getElementById('code-input').value;
+        const status = document.getElementById('import-status');
+        try {
+            const cfg = parseConfigObjects(text);
+            applyImportedConfig(cfg);
+            status.className = 'success';
+            status.textContent = 'Config loaded and applied.';
+        } catch (err) {
+            status.className = 'error';
+            status.textContent = err.message;
+        }
+    });
+
+    document.getElementById('respawn-btn').addEventListener('click', respawn);
+
+    // Esc closes overlays; ignore other global shortcuts while typing.
+    window.addEventListener('keydown', (e) => {
+        if (isTypingInField(e)) return;
+        if (e.key === 'Escape') {
+            exportOverlay.style.display = 'none';
+            importOverlay.style.display = 'none';
+        }
+    });
+</script>
+</body>
+</html>
