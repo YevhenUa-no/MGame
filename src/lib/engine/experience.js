@@ -32,7 +32,7 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
   // reads one unified contract regardless of input source. On a
   // non-touch device this returns { enabled: false, dispose(){} } and
   // mounts nothing.
-  const touch = createTouchControls(domElement);
+  const touch = createTouchControls();
   const cameraRig = createCameraRig(camera, canvas, cameraConfig);
 
   // --- Multiplayer ----------------------------------------------------
