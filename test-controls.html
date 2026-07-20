@@ -41,7 +41,7 @@
 
     <script type="module">
         import { createCore } from './src/lib/engine/core.js';
-        import { createPlayer, updatePlayer, PHYSICS_CONFIG } from './src/lib/engine/player.js';
+        import { createPlayer, updatePlayer } from './src/lib/engine/player.js';
         import { createInputController } from './src/lib/engine/inputController.js';
         import { createCameraRig } from './src/lib/engine/cameraRig.js';
         
@@ -214,12 +214,16 @@
         feelFolder.add(cameraRig.state, 'lookLerp', 0.5, 15, 0.1).name('Look Snappiness');
         
         const physFolder = gui.addFolder('Physics');
-        physFolder.add(PHYSICS_CONFIG, 'gravity', -60, -5, 1).name('Gravity');
-        physFolder.add(PHYSICS_CONFIG, 'jumpSpeed', 2, 25, 0.5).name('Jump Strength');
-        physFolder.add(PHYSICS_CONFIG, 'walkSpeed', 1, 15, 0.1).name('Walk Speed');
-        physFolder.add(PHYSICS_CONFIG, 'runSpeed', 2, 25, 0.1).name('Run Speed');
-        physFolder.add(PHYSICS_CONFIG, 'moveAccel', 10, 100, 1).name('Acceleration');
-        physFolder.add(PHYSICS_CONFIG, 'moveDamping', 1, 30, 0.5).name('Friction / Damping');
+        player.config.jumpForce = player.config.jumpSpeed;
+        player.config.moveSpeed = player.config.walkSpeed;
+        player.config.sprintMultiplier = player.config.runSpeed / player.config.walkSpeed;
+        
+        physFolder.add(player.config, 'gravity', -60, -5, 1).name('Gravity');
+        physFolder.add(player.config, 'jumpForce', 2, 25, 0.5).name('Jump Strength');
+        physFolder.add(player.config, 'moveSpeed', 1, 15, 0.1).name('Walk Speed');
+        physFolder.add(player.config, 'sprintMultiplier', 1, 5, 0.1).name('Sprint Mult');
+        physFolder.add(player.config, 'moveAccel', 10, 100, 1).name('Acceleration');
+        physFolder.add(player.config, 'moveDamping', 1, 30, 0.5).name('Friction / Damping');
         
         const systemParams = { targetFPS: 60 };
         gui.add(systemParams, 'targetFPS', 10, 144, 1).name('Simulated FPS');
