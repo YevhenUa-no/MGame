@@ -13,14 +13,7 @@
       jump: 'Space',
       run: 'ShiftLeft'
     },
-    moveSpeed: 4.6,
-    sprintMultiplier: 1.8,
     turnSpeed: 6.5,
-    enableGravity: true,
-    gravity: -10,
-    jumpForce: 8,
-    maxFallSpeed: -32,
-    groundY: 0,
     enableCollisions: true,
     collisionRadius: 0.3,
     collisionHeight: 1.8
