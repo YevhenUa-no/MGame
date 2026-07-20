@@ -572,16 +572,28 @@
     const _idealOffset = new THREE.Vector3();
     const _idealLookAt = new THREE.Vector3();
 
+    const _currentLookAt = new THREE.Vector3();
+    let _camInitialized = false;
+
     function updateFollowCamera(dt) {
         _idealOffset
             .set(params.followOffsetX, params.followOffsetY, params.followOffsetZ)
             .applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw)
             .add(player.mesh.position);
             
-        camera.position.lerp(_idealOffset, THREE.MathUtils.clamp(params.followSmoothing, 0.01, 1));
+        _idealLookAt.copy(player.mesh.position).add(new THREE.Vector3(0, 1.0, 0));
+
+        if (!_camInitialized) {
+            camera.position.copy(_idealOffset);
+            _currentLookAt.copy(_idealLookAt);
+            _camInitialized = true;
+        } else {
+            const t = 1 - Math.pow(1 - params.followSmoothing, dt * 60);
+            camera.position.lerp(_idealOffset, t);
+            _currentLookAt.lerp(_idealLookAt, 1 - Math.exp(-5 * dt));
+        }
         
-        _idealLookAt.copy(player.mesh.position).add(new THREE.Vector3(0, 1.2, 0));
-        camera.lookAt(_idealLookAt);
+        camera.lookAt(_currentLookAt);
     }
 
     function updateFreeCamera() {
