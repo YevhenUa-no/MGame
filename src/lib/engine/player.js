@@ -6,7 +6,7 @@ export const DEFAULT_PHYSICS_CONFIG = {
   moveDamping: 10,
   walkSpeed: 4.6,
   runSpeed: 8.28,
-  jumpSpeed: 8,
+  jumpForce: 8,
   maxFallSpeed: -32,
   enableGravity: true
 };
@@ -452,7 +452,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   const maxFall = config.maxFallSpeed !== undefined ? config.maxFallSpeed : DEFAULT_PHYSICS_CONFIG.maxFallSpeed;
   const walkSpeed = config.moveSpeed !== undefined ? config.moveSpeed : DEFAULT_PHYSICS_CONFIG.walkSpeed;
   const runSpeed = (config.moveSpeed && config.sprintMultiplier) ? config.moveSpeed * config.sprintMultiplier : DEFAULT_PHYSICS_CONFIG.runSpeed;
-  const jumpForce = config.jumpForce !== undefined ? config.jumpForce : DEFAULT_PHYSICS_CONFIG.jumpSpeed;
+  const jumpForce = config.jumpForce !== undefined ? config.jumpForce : DEFAULT_PHYSICS_CONFIG.jumpForce;
   const turnSpeed = config.turnSpeed !== undefined ? config.turnSpeed : 12;
 
   // --- 1. Gravity ----------------------------------------------------------
