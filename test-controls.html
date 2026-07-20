@@ -209,14 +209,7 @@
         // 2. GUI SETUP (lil-gui)
         const gui = new GUI({ title: 'Camera Settings' });
         
-        const camFolder = gui.addFolder('Camera Rig');
-        camFolder.add(cameraRig.state, 'distance', 1, 15, 0.1).name('Distance Behind');
-        camFolder.add(cameraRig.state, 'height', 0.5, 10, 0.1).name('Height Offset');
-        camFolder.add(cameraRig.state, 'pitch', -1.5, 1.5, 0.01).name('Pitch (Tilt)');
-        
-        const feelFolder = gui.addFolder('Movement Feel');
-        feelFolder.add(cameraRig.state, 'followLerp', 0.5, 15, 0.1).name('Follow Snappiness');
-        feelFolder.add(cameraRig.state, 'lookLerp', 0.5, 15, 0.1).name('Look Snappiness');
+
         
         const physFolder = gui.addFolder('Physics');
         player.config.jumpForce = player.config.jumpSpeed;
@@ -233,13 +226,7 @@
         const systemParams = { targetFPS: 60 };
         gui.add(systemParams, 'targetFPS', 10, 144, 1).name('Simulated FPS');
 
-        const defaultState = {
-            distance: 6.5,
-            height: 3.2,
-            pitch: -0.42,
-            followLerp: 3.2,
-            lookLerp: 5
-        };
+
             // --- VISUAL PHYSICS ARROWS ---
             // Create arrow helpers to match the user's diagram
             const gravityArrow = new THREE.ArrowHelper(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 0), 1, 0xaacc00, 0.2, 0.2);
