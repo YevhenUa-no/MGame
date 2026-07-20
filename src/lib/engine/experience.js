@@ -32,7 +32,7 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
   // reads one unified contract regardless of input source. On a
   // non-touch device this returns { enabled: false, dispose(){} } and
   // mounts nothing.
-  const touch = createTouchControls(input.state);
+  const touch = createTouchControls(domElement);
   const cameraRig = createCameraRig(camera, canvas, cameraConfig);
 
   // --- Multiplayer ----------------------------------------------------
@@ -56,13 +56,20 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
     const frameDelta = Math.min(clock.getDelta(), 0.25);
     accumulator += frameDelta;
 
+    const mergedInput = {
+      moveX: (Math.abs(touch.state.moveX) > 0.01 ? touch.state.moveX : input.state.moveX),
+      moveZ: (Math.abs(touch.state.moveZ) > 0.01 ? touch.state.moveZ : input.state.moveZ),
+      jump: touch.state.jump || input.state.jump,
+      run: touch.state.run || input.state.run
+    };
+
     // Fixed-timestep physics substeps decoupled from render framerate: this
     // keeps capsule-vs-BVH collision resolution stable and repeatable
     // whether the browser is doing 30fps or 144fps, which matters a lot
     // for a hand-tuned "cozy" movement feel.
     let steps = 0;
     while (accumulator >= FIXED_TIMESTEP && steps < MAX_SUBSTEPS) {
-      updatePlayer(player, collider, input.state, cameraRig.yaw, FIXED_TIMESTEP);
+      updatePlayer(player, collider, mergedInput, cameraRig.yaw, FIXED_TIMESTEP);
       accumulator -= FIXED_TIMESTEP;
       steps += 1;
     }

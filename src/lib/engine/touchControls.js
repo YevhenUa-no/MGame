@@ -16,12 +16,16 @@ export function isTouchDevice() {
  * lib/engine/) and writes straight into the SAME input state object the
  * keyboard controller uses, so player.js never needs to know which input
  * source is active.
- *
- * @param inputState  the `state` object returned by createInputController()
- */
-export function createTouchControls(inputState) {
+export function createTouchControls(zone) {
+  const state = {
+    moveX: 0,
+    moveZ: 0,
+    jump: false,
+    run: false
+  };
+
   if (!isTouchDevice()) {
-    return { enabled: false, dispose() {} };
+    return { enabled: false, state, dispose() {} };
   }
 
   injectStylesOnce();
@@ -58,8 +62,8 @@ export function createTouchControls(inputState) {
   function resetJoystick() {
     activeTouchId = null;
     setKnobOffset(0, 0);
-    inputState.moveX = 0;
-    inputState.moveZ = 0;
+    state.moveX = 0;
+    state.moveZ = 0;
   }
 
   function findTouch(touchList) {
@@ -103,8 +107,8 @@ export function createTouchControls(inputState) {
     // Screen-space drag maps directly to the same moveX/moveZ contract
     // WASD writes: dragging the knob up (toward the horizon) should move
     // the player forward, matching KeyW's moveZ = -1.
-    inputState.moveX = dx / MAX_RADIUS;
-    inputState.moveZ = -dy / MAX_RADIUS;
+    state.moveX = dx / MAX_RADIUS;
+    state.moveZ = -dy / MAX_RADIUS;
   }
 
   function onTouchEnd(event) {
@@ -121,10 +125,10 @@ export function createTouchControls(inputState) {
   function bindHoldButton(button, key) {
     const press = (event) => {
       event.preventDefault();
-      inputState[key] = true;
+      state[key] = true;
     };
     const release = () => {
-      inputState[key] = false;
+      state[key] = false;
     };
     button.addEventListener('touchstart', press, { passive: false });
     button.addEventListener('touchend', release, { passive: true });
@@ -136,12 +140,12 @@ export function createTouchControls(inputState) {
 
   function dispose() {
     resetJoystick();
-    inputState.run = false;
-    inputState.jump = false;
+    state.run = false;
+    state.jump = false;
     root.remove();
   }
 
-  return { enabled: true, dispose };
+  return { enabled: true, state, dispose };
 }
 
 function injectStylesOnce() {
