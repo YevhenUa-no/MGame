@@ -46,6 +46,11 @@
         import { createCameraRig } from './src/lib/engine/cameraRig.js';
         
         import * as THREE from 'three';
+        import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+        
+        THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+        THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+        THREE.Mesh.prototype.raycast = acceleratedRaycast;
         import GUI from 'https://esm.sh/lil-gui';
         import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
