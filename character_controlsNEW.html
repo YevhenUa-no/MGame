@@ -724,11 +724,21 @@
     const _pipOffset = new THREE.Vector3();
     const _pipLookAt = new THREE.Vector3();
 
+    const FIXED_TIMESTEP = 1 / 60;
+    const MAX_SUBSTEPS = 5;
+    let accumulator = 0;
+
     function animate() {
         requestAnimationFrame(animate);
         const dt = Math.min(clock.getDelta(), 0.05); // clamp to avoid big jumps on tab-switch
+        accumulator += dt;
 
-        updateCharacter(dt);
+        let steps = 0;
+        while (accumulator >= FIXED_TIMESTEP && steps < MAX_SUBSTEPS) {
+            updateCharacter(FIXED_TIMESTEP);
+            accumulator -= FIXED_TIMESTEP;
+            steps += 1;
+        }
 
         if (charCollisionHelper) {
             charCollisionHelper.visible = params.showCharCollision;
