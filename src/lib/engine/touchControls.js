@@ -16,7 +16,8 @@ export function isTouchDevice() {
  * lib/engine/) and writes straight into the SAME input state object the
  * keyboard controller uses, so player.js never needs to know which input
  * source is active.
-export function createTouchControls(zone) {
+ */
+export function createTouchControls() {
   const state = {
     moveX: 0,
     moveZ: 0,
