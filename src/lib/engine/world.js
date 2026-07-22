@@ -46,11 +46,12 @@ export function buildWorld(scene) {
   groundMesh.position.y = -0.5;
   groundMesh.receiveShadow = true;
   group.add(groundMesh);
-  collidableGeometries.push(prepForMerge(groundGeo, groundMesh));
+  // Intentionally omitting groundMesh from collidableGeometries to use hard floor physics instead
 
   // A slightly raised inner disc breaks up the flat green with a two-tone
-  // "clearing" look, which is a big part of the low-poly cozy read.
-  const clearingGeo = new THREE.CylinderGeometry(9, 9.6, 0.15, 7, 1);
+  // "clearing" look. It's now flattened to 2cm so the player doesn't clip
+  // through it since it lacks BVH collision.
+  const clearingGeo = new THREE.CylinderGeometry(9, 9.6, 0.02, 7, 1);
   const clearingMesh = new THREE.Mesh(
     clearingGeo,
     new THREE.MeshStandardMaterial({
@@ -59,11 +60,11 @@ export function buildWorld(scene) {
       roughness: 1
     })
   );
-  clearingMesh.position.y = 0.075;
+  clearingMesh.position.y = 0.01;
   clearingMesh.receiveShadow = true;
   clearingMesh.castShadow = false;
   group.add(clearingMesh);
-  collidableGeometries.push(prepForMerge(clearingGeo, clearingMesh));
+  // Intentionally omitting clearingMesh from collidableGeometries
 
   // --- Obstacles: crates, a low wall ring, and a couple of rock clusters --
   // NOTE: unchanged. New library types (below) are intentionally NOT added

@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 
 export const DEFAULT_PHYSICS_CONFIG = {
-  gravity: 0,
+  gravity: -80,
   moveAccel: 55,
   moveDamping: 10,
   walkSpeed: 4.6,
   runSpeed: 8.28,
-  jumpSpeed: 56.5,
-  fallMultiplier: 1.15,
-  riseMultiplier: 1.0,
+  jumpSpeed: 16.5,
+  fallMultiplier: 1,
+  riseMultiplier: 1,
   airMoveSpeed: 4.6,
-  maxFallSpeed: -73,
+  maxFallSpeed: -8,
   enableGravity: true,
   turnSpeed: 4.5,
   collisionRadius: 0.3,
