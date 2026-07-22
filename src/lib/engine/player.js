@@ -1,14 +1,21 @@
 import * as THREE from 'three';
 
 export const DEFAULT_PHYSICS_CONFIG = {
-  gravity: -10,
+  gravity: -20,
   moveAccel: 55,
   moveDamping: 10,
   walkSpeed: 4.6,
   runSpeed: 8.28,
-  jumpForce: 8,
-  maxFallSpeed: -32,
-  enableGravity: true
+  jumpSpeed: 7,
+  fallMultiplier: 1.0,
+  riseMultiplier: 1.0,
+  airMoveSpeed: 4.6,
+  maxFallSpeed: -30,
+  enableGravity: true,
+  turnSpeed: 4.5,
+  collisionRadius: 0.3,
+  collisionHeight: 1.8,
+  startPosition: [0.49, 0.15, 2.32]
 };
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
@@ -27,17 +34,17 @@ const _right = new THREE.Vector3();
 const _upAxis = new THREE.Vector3(0, 1, 0);
 
 export const DEFAULT_APPEARANCE = {
-  clothingColor: '#64b5f6',
-  skinColor: '#f4c98b',
-  pantsColor: '#3d5a80',
-  bootsColor: '#4f3824',
+  clothingColor: '#f764ba',
+  skinColor: '#e5b571',
+  pantsColor: '#18365d',
+  bootsColor: '#794415',
   detailsColor: '#222222',
   backpackColor: '#8a5a36',
-  sleepingBagColor: '#dc5a5a',
-  heightScale: 1.0,
-  headSize: 1.0,
-  limbThickness: 1.0,
-  torsoWidth: 1.0
+  sleepingBagColor: '#d01616',
+  heightScale: 0.96,
+  headSize: 0.94,
+  limbThickness: 0.9,
+  torsoWidth: 1.04
 };
 
 export function buildCharacterModel(appearanceConfig = {}) {
@@ -290,11 +297,11 @@ export function updateAppearance(mesh, config) {
 
 export const DEFAULT_ANIMATION = {
   enableWalkAnim: true,
-  walkAnimSpeed: 8,
-  walkAnimAmplitude: 0.55,
-  enableIdleBob: true,
-  idleBobSpeed: 1.6,
-  idleBobAmplitude: 0.02
+  walkAnimSpeed: 7,
+  walkAnimAmplitude: 0.65,
+  enableIdleBob: false,
+  idleBobSpeed: 3.7,
+  idleBobAmplitude: 0
 };
 
 export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, animationConfig = {}) {
@@ -448,16 +455,20 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
 export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   const { mesh, capsuleInfo, velocity, config } = player;
 
-  const grav = config.gravity !== undefined ? config.gravity : DEFAULT_PHYSICS_CONFIG.gravity;
+  const jumpSpeed = Number(config.jumpSpeed !== undefined ? config.jumpSpeed : DEFAULT_PHYSICS_CONFIG.jumpSpeed) || 8;
+  const grav = Number(config.gravity !== undefined ? config.gravity : DEFAULT_PHYSICS_CONFIG.gravity) || -10;
+  const fallMultiplier = Number(config.fallMultiplier !== undefined ? config.fallMultiplier : DEFAULT_PHYSICS_CONFIG.fallMultiplier) || 1;
+  const riseMultiplier = Number(config.riseMultiplier !== undefined ? config.riseMultiplier : DEFAULT_PHYSICS_CONFIG.riseMultiplier) || 1;
   const maxFall = config.maxFallSpeed !== undefined ? config.maxFallSpeed : DEFAULT_PHYSICS_CONFIG.maxFallSpeed;
   const walkSpeed = config.moveSpeed !== undefined ? config.moveSpeed : DEFAULT_PHYSICS_CONFIG.walkSpeed;
   const runSpeed = (config.moveSpeed && config.sprintMultiplier) ? config.moveSpeed * config.sprintMultiplier : DEFAULT_PHYSICS_CONFIG.runSpeed;
-  const jumpForce = config.jumpForce !== undefined ? config.jumpForce : DEFAULT_PHYSICS_CONFIG.jumpForce;
+  const airMoveSpeed = config.airMoveSpeed !== undefined ? config.airMoveSpeed : walkSpeed;
   const turnSpeed = config.turnSpeed !== undefined ? config.turnSpeed : 12;
 
   // --- 1. Gravity ----------------------------------------------------------
   if (config.enableGravity !== false) {
-    velocity.y += grav * deltaTime;
+    const appliedGrav = velocity.y < 0 ? grav * fallMultiplier : grav * riseMultiplier;
+    velocity.y += appliedGrav * deltaTime;
     if (velocity.y < maxFall) velocity.y = maxFall;
   }
 
@@ -477,7 +488,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
       .addScaledVector(_forward, _moveInput.z)
       .normalize();
 
-    const targetSpeed = (input.run ? runSpeed : walkSpeed) * inputMagnitude;
+    const targetSpeed = (player.isGrounded ? (input.run ? runSpeed : walkSpeed) : airMoveSpeed) * inputMagnitude;
     velocity.x += (_moveDirWorld.x * targetSpeed - velocity.x) * Math.min(1, config.moveAccel * deltaTime);
     velocity.z += (_moveDirWorld.z * targetSpeed - velocity.z) * Math.min(1, config.moveAccel * deltaTime);
 
@@ -490,7 +501,7 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   }
 
   if (input.jump && player.isGrounded) {
-    velocity.y = jumpForce;
+    velocity.y = jumpSpeed;
     player.isGrounded = false;
   }
 

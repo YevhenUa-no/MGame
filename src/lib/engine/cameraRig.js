@@ -9,11 +9,11 @@ const defaultCameraConfig = {
   mode: 'follow',
   follow: {
     offsetX: 0,
-    offsetY: 3.2,
-    offsetZ: 6.5,
+    offsetY: 2.6548986885658583,
+    offsetZ: 3.782159877387497,
     smoothing: 0.15,
     autoAlign: true,
-    autoAlignForce: 2.0
+    autoAlignForce: 7.4
   },
   free: {
     position: [10, 8, 10],

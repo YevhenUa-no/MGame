@@ -57,10 +57,10 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
     accumulator += frameDelta;
 
     const mergedInput = {
-      moveX: (Math.abs(touch.state.moveX) > 0.01 ? touch.state.moveX : input.state.moveX),
-      moveZ: (Math.abs(touch.state.moveZ) > 0.01 ? touch.state.moveZ : input.state.moveZ),
-      jump: touch.state.jump || input.state.jump,
-      run: touch.state.run || input.state.run
+      moveX: (Math.abs(touch.state.moveX) > 0.01 ? touch.state.moveX : input.state.moveX) || 0,
+      moveZ: (Math.abs(touch.state.moveZ) > 0.01 ? touch.state.moveZ : input.state.moveZ) || 0,
+      jump: !!(touch.state.jump || input.state.jump),
+      run: !!(touch.state.run || input.state.run)
     };
 
     // Fixed-timestep physics substeps decoupled from render framerate: this

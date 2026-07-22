@@ -132,7 +132,7 @@
 </div>
 
 <div id="controls-hint">
-    WASD / Arrows — move<br>
+    SWAD / Arrows — move<br>
     Space — jump (Gravity off: fly up)<br>
     Shift — sprint (Gravity off: fly down)<br>
     Mouse drag — orbit camera (Free mode only)
@@ -404,8 +404,8 @@
         startX: PLAYER_START_POSITION[0], startY: PLAYER_START_POSITION[1], startZ: PLAYER_START_POSITION[2],
 
         // Keybindings
-        keyForward: 'KeyW',
-        keyBackward: 'KeyS',
+        keyForward: 'KeyS',
+        keyBackward: 'KeyW',
         keyLeft: 'KeyA',
         keyRight: 'KeyD',
         keyJump: 'Space',
@@ -417,6 +417,7 @@
         // Movement
         moveSpeed: 4.6,
         sprintMultiplier: 1.8,
+        airMoveSpeed: DEFAULT_PHYSICS_CONFIG.airMoveSpeed,
         turnSpeed: 6.5,
         moveAccel: DEFAULT_PHYSICS_CONFIG.moveAccel,
         moveDamping: DEFAULT_PHYSICS_CONFIG.moveDamping,
@@ -424,7 +425,9 @@
         // Physics
         enableGravity: DEFAULT_PHYSICS_CONFIG.enableGravity,
         gravity: DEFAULT_PHYSICS_CONFIG.gravity,
-        jumpForce: DEFAULT_PHYSICS_CONFIG.jumpForce,
+        jumpSpeed: DEFAULT_PHYSICS_CONFIG.jumpSpeed,
+        fallMultiplier: DEFAULT_PHYSICS_CONFIG.fallMultiplier,
+        riseMultiplier: DEFAULT_PHYSICS_CONFIG.riseMultiplier,
         maxFallSpeed: DEFAULT_PHYSICS_CONFIG.maxFallSpeed,
         groundY: 0,
 
@@ -636,12 +639,15 @@
         Object.assign(player.config, {
             moveSpeed: params.moveSpeed,
             sprintMultiplier: params.sprintMultiplier,
+            airMoveSpeed: params.airMoveSpeed,
             turnSpeed: params.turnSpeed,
             moveAccel: params.moveAccel,
             moveDamping: params.moveDamping,
             enableGravity: params.enableGravity,
             gravity: params.gravity,
-            jumpForce: params.jumpForce,
+            jumpSpeed: params.jumpSpeed,
+            fallMultiplier: params.fallMultiplier,
+            riseMultiplier: params.riseMultiplier,
             maxFallSpeed: params.maxFallSpeed,
             groundY: params.groundY
         });
@@ -868,18 +874,21 @@
     startFolder.add({ respawn }, 'respawn').name('Respawn Here');
 
     const moveFolder = gui.addFolder('Movement');
-    moveFolder.add(params, 'moveSpeed', 0.5, 20, 0.1).name('Move Speed');
-    moveFolder.add(params, 'sprintMultiplier', 1, 4, 0.1).name('Sprint x (Shift)');
-    moveFolder.add(params, 'turnSpeed', 1, 30, 0.5).name('Turn Speed');
-    moveFolder.add(params, 'moveAccel', 1, 100, 1).name('Move Accel');
-    moveFolder.add(params, 'moveDamping', 0.5, 30, 0.5).name('Move Damping');
+    moveFolder.add(params, 'moveSpeed', -2000, 2000, 0.1).name('Move Speed');
+    moveFolder.add(params, 'airMoveSpeed', -2000, 2000, 0.1).name('Air Move Speed');
+    moveFolder.add(params, 'sprintMultiplier', -2000, 2000, 0.1).name('Sprint x (Shift)');
+    moveFolder.add(params, 'turnSpeed', -2000, 2000, 0.5).name('Turn Speed');
+    moveFolder.add(params, 'moveAccel', -2000, 2000, 1).name('Move Accel');
+    moveFolder.add(params, 'moveDamping', -2000, 2000, 0.5).name('Move Damping');
 
     const physicsFolder = gui.addFolder('Physics');
     physicsFolder.add(params, 'enableGravity').name('Enable Gravity').onChange(() => { player.velocity.set(0, 0, 0); });
-    physicsFolder.add(params, 'gravity', -60, -1, 0.5).name('Gravity');
-    physicsFolder.add(params, 'jumpForce', 0, 25, 0.5).name('Jump Force');
-    physicsFolder.add(params, 'maxFallSpeed', -80, -5, 1).name('Max Fall Speed');
-    physicsFolder.add(params, 'groundY', -10, 10, 0.1).name('Ground Y');
+    physicsFolder.add(params, 'gravity', -2000, 2000, 0.5).name('Gravity');
+    physicsFolder.add(params, 'jumpSpeed', -2000, 2000, 0.5).name('Jump Speed');
+    physicsFolder.add(params, 'riseMultiplier', 0.1, 10, 0.1).name('Rise Multiplier');
+    physicsFolder.add(params, 'fallMultiplier', 0.1, 10, 0.1).name('Fall Multiplier');
+    physicsFolder.add(params, 'maxFallSpeed', -2000, 2000, 1).name('Max Fall Speed');
+    physicsFolder.add(params, 'groundY', -2000, 2000, 0.1).name('Ground Y');
 
     const collisionFolder = gui.addFolder('Collision');
     collisionFolder.add(params, 'enableCollisions').name('Enable Collisions');
@@ -936,13 +945,16 @@
       run: '${params.keySprint}'
     },
     moveSpeed: ${params.moveSpeed},
+    airMoveSpeed: ${params.airMoveSpeed},
     sprintMultiplier: ${params.sprintMultiplier},
     turnSpeed: ${params.turnSpeed},
     moveAccel: ${params.moveAccel},
     moveDamping: ${params.moveDamping},
     enableGravity: ${params.enableGravity},
     gravity: ${params.gravity},
-    jumpForce: ${params.jumpForce},
+    jumpSpeed: ${params.jumpSpeed},
+    fallMultiplier: ${params.fallMultiplier},
+    riseMultiplier: ${params.riseMultiplier},
     maxFallSpeed: ${params.maxFallSpeed},
     groundY: ${params.groundY},
     collisionRadius: ${params.charRadius},
@@ -999,10 +1011,50 @@
             const literal = m[1].replace(/;\s*$/, '');
             return Function('"use strict"; return (' + literal + ');')();
         };
-        const characterConfig = extract('characterConfig');
+
+        let characterConfig = extract('characterConfig');
         const cameraConfig = extract('cameraConfig');
+
+        // Hero.html-style exports split things into separate
+        // movementConfig / physicsConfig objects instead of one
+        // characterConfig, and use a few different key names
+        // (jumpForce instead of jumpSpeed). Recognize those too and
+        // fold them into a characterConfig-shaped object so the rest
+        // of applyImportedConfig doesn't need to know the difference.
+        const movementConfig = extract('movementConfig');
+        const physicsConfig = extract('physicsConfig');
+        if (movementConfig || physicsConfig) {
+            characterConfig = { ...(characterConfig || {}) };
+            if (movementConfig) {
+                Object.assign(characterConfig, movementConfig);
+            }
+            if (physicsConfig) {
+                const { jumpForce, ...rest } = physicsConfig;
+                Object.assign(characterConfig, rest);
+                if (typeof jumpForce === 'number' && characterConfig.jumpSpeed === undefined) {
+                    characterConfig.jumpSpeed = jumpForce;
+                }
+            }
+        }
+
+        // Hero.html's cameraConfig.follow uses distance/height instead
+        // of offsetX/offsetY/offsetZ. Translate distance -> offsetZ and
+        // height -> offsetY (its follow camera sits directly behind the
+        // character at that distance/height, offsetX 0), so importing
+        // it here lands in roughly the same spot.
+        if (cameraConfig && cameraConfig.follow) {
+            const f = cameraConfig.follow;
+            if (typeof f.distance === 'number' && f.offsetZ === undefined) {
+                f.offsetX = 0;
+                f.offsetZ = f.distance;
+            }
+            if (typeof f.height === 'number' && f.offsetY === undefined) {
+                f.offsetY = f.height;
+            }
+        }
+
         if (!characterConfig && !cameraConfig) {
-            throw new Error('Could not find a characterConfig or cameraConfig object in the pasted text.');
+            throw new Error('Could not find a characterConfig, movementConfig/physicsConfig, or cameraConfig object in the pasted text.');
         }
         return { characterConfig, cameraConfig };
     }
@@ -1028,7 +1080,10 @@
             if (typeof c.moveDamping === 'number') params.moveDamping = c.moveDamping;
             if (typeof c.enableGravity === 'boolean') params.enableGravity = c.enableGravity;
             if (typeof c.gravity === 'number') params.gravity = c.gravity;
-            if (typeof c.jumpForce === 'number') params.jumpForce = c.jumpForce;
+            if (typeof c.jumpSpeed === 'number') params.jumpSpeed = c.jumpSpeed;
+            if (typeof c.fallMultiplier === 'number') params.fallMultiplier = c.fallMultiplier;
+            if (typeof c.riseMultiplier === 'number') params.riseMultiplier = c.riseMultiplier;
+            if (typeof c.airMoveSpeed === 'number') params.airMoveSpeed = c.airMoveSpeed;
             if (typeof c.maxFallSpeed === 'number') params.maxFallSpeed = c.maxFallSpeed;
             if (typeof c.groundY === 'number') params.groundY = c.groundY;
             if (typeof c.enableCollisions === 'boolean') params.enableCollisions = c.enableCollisions;
