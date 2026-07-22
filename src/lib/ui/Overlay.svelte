@@ -93,7 +93,6 @@
 <div class="hud" class:touch-mode={isTouch}>
   <div class="hud-corner" bind:this={cornerEl}>
     <span class="eyebrow">a quiet clearing</span>
-    <h1>Cozy Explorer</h1>
     <p class="hint">
       {#if isTouch}
         Joystick to move · RUN / JUMP buttons · drag to look around

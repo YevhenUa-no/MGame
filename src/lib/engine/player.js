@@ -1,21 +1,21 @@
 import * as THREE from 'three';
 
 export const DEFAULT_PHYSICS_CONFIG = {
-  gravity: -20,
+  gravity: 0,
   moveAccel: 55,
   moveDamping: 10,
   walkSpeed: 4.6,
   runSpeed: 8.28,
-  jumpSpeed: 7,
-  fallMultiplier: 1.0,
+  jumpSpeed: 56.5,
+  fallMultiplier: 1.15,
   riseMultiplier: 1.0,
   airMoveSpeed: 4.6,
-  maxFallSpeed: -30,
+  maxFallSpeed: -73,
   enableGravity: true,
   turnSpeed: 4.5,
   collisionRadius: 0.3,
   collisionHeight: 1.8,
-  startPosition: [0.49, 0.15, 2.32]
+  startPosition: [0, 1.0, 4]
 };
 
 // Scratch objects reused every frame — allocating Vector3/Box3/Matrix4
@@ -412,11 +412,15 @@ export function animateAvatar(mesh, deltaTime, isGrounded, horizontalSpeed, anim
 }
 
 export function createPlayer(scene, characterConfig = {}, appearanceConfig = {}, animationConfig = {}) {
-  const radius = characterConfig.collisionRadius || 0.35;
-  const cylinderLength = (characterConfig.collisionHeight || 1.6) - (radius * 2);
+  // Build config first so startPosition/collisionRadius/collisionHeight
+  // all come from ONE merged source instead of characterConfig and
+  // DEFAULT_PHYSICS_CONFIG disagreeing with each other.
+  const config = { ...DEFAULT_PHYSICS_CONFIG, ...characterConfig };
+  const radius = config.collisionRadius;
+  const cylinderLength = config.collisionHeight - (radius * 2);
 
   const mesh = buildCharacterModel(appearanceConfig);
-  const startPos = characterConfig.startPosition || [0, 1.0, 4];
+  const startPos = config.startPosition;
   mesh.position.set(...startPos);
   scene.add(mesh);
 
@@ -435,7 +439,14 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
     velocity: new THREE.Vector3(),
     isGrounded: false,
     height: cylinderLength + radius * 2,
-    config: { ...DEFAULT_PHYSICS_CONFIG, ...characterConfig },
+    config,
+    // Where updatePlayer()'s fall-through-world safety net sends the
+    // player back to. Kept as a live Vector3 (not baked into config)
+    // so callers can update it on respawn without re-creating the
+    // player — see updatePlayer()'s step 5, and the tuner HTML's
+    // respawn() which now keeps this in sync with the Start Position
+    // GUI fields.
+    spawnPosition: new THREE.Vector3(...startPos),
     animationConfig
   };
 }
@@ -516,10 +527,15 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   if (bvh) {
     _tempBox.makeEmpty();
     _tempMat.copy(collider.matrixWorld).invert();
+    
+    // Crucial: We must extract only the position from mesh.matrixWorld. 
+    // Applying the whole matrix scales the capsule segment if the mesh has a scale (like heightScale=0.96),
+    // which creates phantom vertical offsets that instantly cancel jump velocity.
+    const meshWorldPos = _tempVector.setFromMatrixPosition(mesh.matrixWorld);
+    
     _tempSegment.copy(capsuleInfo.segment);
-
-    _tempSegment.start.applyMatrix4(mesh.matrixWorld).applyMatrix4(_tempMat);
-    _tempSegment.end.applyMatrix4(mesh.matrixWorld).applyMatrix4(_tempMat);
+    _tempSegment.start.add(meshWorldPos).applyMatrix4(_tempMat);
+    _tempSegment.end.add(meshWorldPos).applyMatrix4(_tempMat);
 
     _tempBox.expandByPoint(_tempSegment.start);
     _tempBox.expandByPoint(_tempSegment.end);
@@ -565,17 +581,15 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   const halfHeight = player.height / 2;
   const floorY = config.groundY !== undefined ? config.groundY : 0.0;
   
-  if (!bvh) {
-    // Hard fallback if no BVH exists
-    if (mesh.position.y <= floorY) {
-      mesh.position.y = floorY;
-      velocity.y = 0;
-      player.isGrounded = true;
-    } else {
-      player.isGrounded = false;
-    }
+  // 1. Hard floor logic (always applies)
+  if (mesh.position.y <= floorY) {
+    mesh.position.y = floorY;
+    velocity.y = 0;
+    player.isGrounded = true;
+  } else if (!bvh) {
+    player.isGrounded = false;
   } else {
-    // If we have BVH, trust the collision flag
+    // 2. If we have BVH and are above the floor, trust the collision flag
     player.isGrounded = isCollidingWithFloor;
     if (player.isGrounded && velocity.y < 0) {
       velocity.y = 0;
@@ -584,8 +598,9 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 5. Fallback safety net ------------------------------------------------
   if (mesh.position.y < -10) {
-    mesh.position.set(0, 1.0, 4);
+    mesh.position.copy(player.spawnPosition);
     velocity.set(0, 0, 0);
+    player.isGrounded = false;
   }
 
   // --- 6. Animate Avatar ---------------------------------------------------
