@@ -601,10 +601,10 @@ function createObstacle(def) {
             // Mesh rotation moved to the end of the update loop
             // Move player to align with cannon
             if (player && player.mesh) {
-               const playerOffset = new THREE.Vector3(0, 0, -1.0).applyMatrix4(new THREE.Matrix4().extractRotation(this.mesh.matrixWorld));
+               const playerOffset = new THREE.Vector3(0, 0, -1.0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.yaw);
                player.mesh.position.copy(this.mesh.position).add(playerOffset);
-               // Also push player down to ground level instead of floating at barrel height if cannon is high
-               player.mesh.position.y = player.config && player.config.startPosition ? player.config.startPosition[1] : 0;
+               // Keep the player at the cannon's base altitude, rather than dropping them to world zero
+               player.mesh.position.y = this.mesh.position.y;
                player.mesh.rotation.y = this.yaw;
                
                // If player uses Kenney Archer, set to idle or aiming animation
@@ -645,6 +645,9 @@ function createObstacle(def) {
 
             if (interactJustPressed) {
               player.activeCannon = null;
+              // Hop the player slightly up to ensure they don't clip through the object they are on
+              player.velocity.y = 4.0;
+              player.isGrounded = false;
               if (popup) popup.style.display = 'none';
               if (network) network.sendCannonState(255, 0, 0); // 255 means exit
             }
