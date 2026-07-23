@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { buildCharacterModel, animateAvatar } from './player.js';
+import { buildCharacterModel, animateAvatar, applyArcherToMesh } from './player.js';
 
 // Same critically-damped-feeling lerp used by cameraRig.js — remote
 // avatars arrive at ~15Hz over the network but should still look like they
@@ -22,6 +22,8 @@ export function createRemotePlayers(scene) {
 
   function makeAvatar(color) {
     const mesh = buildCharacterModel(color || [200, 200, 200]);
+    mesh.archerData = { mixer: null, actions: {}, currentAction: null };
+    applyArcherToMesh(mesh, mesh.archerData);
     return mesh;
   }
 
@@ -112,7 +114,26 @@ export function createRemotePlayers(scene) {
       const verticalSpeed = Math.abs(dy) / (deltaTime || 0.016);
       const isGrounded = verticalSpeed < 2.0;
 
-      animateAvatar(mesh, deltaTime, isGrounded, speed);
+      if (mesh.archerData && mesh.archerData.mixer) {
+          mesh.archerData.mixer.update(deltaTime);
+          let targetActionName = 'idle';
+          if (!isGrounded) {
+              targetActionName = 'jump';
+          } else if (speed > 4.6 + 0.1) {
+              targetActionName = 'run';
+          } else if (speed > 0.1) {
+              targetActionName = 'walk';
+          }
+
+          const targetAction = mesh.archerData.actions[targetActionName] || mesh.archerData.actions['idle'];
+          if (targetAction && targetAction !== mesh.archerData.currentAction) {
+              targetAction.reset().fadeIn(0.2).play();
+              if (mesh.archerData.currentAction) mesh.archerData.currentAction.crossFadeTo(targetAction, 0.2, true);
+              mesh.archerData.currentAction = targetAction;
+          }
+      } else {
+          animateAvatar(mesh, deltaTime, isGrounded, speed);
+      }
     }
   }
 

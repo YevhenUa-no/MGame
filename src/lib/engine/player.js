@@ -471,43 +471,56 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
     currentArcherAction: null
   };
 
-  function applyArcher() {
-      if (!archerModelTemplate || !kenneyTex) {
-          setTimeout(applyArcher, 100);
-          return;
-      }
-      if (!player.useKenneyArcher) return;
-      
-      const archerModel = SkeletonUtils.clone(archerModelTemplate.scene);
-      archerModel.position.y = 0;
-      
-      archerModel.traverse((child) => {
-          if (child.isMesh && child.material) {
-              child.material.map = kenneyTex;
-              child.material.needsUpdate = true;
-          }
-      });
-      
-      if (archerModelTemplate.animations && archerModelTemplate.animations.length > 0) {
-          player.archerMixer = new THREE.AnimationMixer(archerModel);
-          archerModelTemplate.animations.forEach((clip) => {
-              player.archerActions[clip.name.toLowerCase()] = player.archerMixer.clipAction(clip);
-          });
-          const idle = player.archerActions['idle'] || Object.values(player.archerActions)[0];
-          if (idle) {
-              idle.play();
-              player.currentArcherAction = idle;
-          }
-      }
-      
-      mesh.children = [];
-      mesh.add(archerModel);
-      mesh.userData = {}; // Disable procedural animation
-  }
-  
-  applyArcher();
+  applyArcherToMesh(mesh, player);
 
   return player;
+}
+
+export function applyArcherToMesh(mesh, targetObj = null) {
+    if (!archerModelTemplate || !kenneyTex) {
+        setTimeout(() => applyArcherToMesh(mesh, targetObj), 100);
+        return;
+    }
+    
+    const archerModel = SkeletonUtils.clone(archerModelTemplate.scene);
+    archerModel.position.y = 0;
+    
+    archerModel.traverse((child) => {
+        if (child.isMesh && child.material) {
+            child.material.map = kenneyTex;
+            child.material.needsUpdate = true;
+        }
+    });
+    
+    let mixer = null;
+    let actions = {};
+    let currentAction = null;
+
+    if (archerModelTemplate.animations && archerModelTemplate.animations.length > 0) {
+        mixer = new THREE.AnimationMixer(archerModel);
+        archerModelTemplate.animations.forEach((clip) => {
+            actions[clip.name.toLowerCase()] = mixer.clipAction(clip);
+        });
+        const idle = actions['idle'] || Object.values(actions)[0];
+        if (idle) {
+            idle.play();
+            currentAction = idle;
+        }
+    }
+    
+    // Remove the old procedural mesh parts properly
+    while(mesh.children.length > 0){ 
+        mesh.remove(mesh.children[0]); 
+    }
+    
+    mesh.add(archerModel);
+    mesh.userData = {}; // Disable procedural animation
+    
+    if (targetObj) {
+        targetObj.archerMixer = mixer;
+        targetObj.archerActions = actions;
+        targetObj.currentArcherAction = currentAction;
+    }
 }
 
 /**

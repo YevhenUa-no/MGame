@@ -130,10 +130,9 @@ export function resolveServerUrl() {
   const configured = import.meta.env?.VITE_MULTIPLAYER_URL;
   if (configured) return configured;
   
-  if (window.location.hostname === 'cozy-explorer.vercel.app') {
-    return 'wss://mgame-production-4f64.up.railway.app';
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return `ws://${window.location.hostname}:8787`;
   }
 
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${protocol}://${window.location.hostname}:8787`;
+  return 'wss://mgame-production-4f64.up.railway.app';
 }

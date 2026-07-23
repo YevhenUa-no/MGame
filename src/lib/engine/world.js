@@ -428,8 +428,8 @@ function createObstacle(def) {
             
             if (popup && dist < 3.0) {
                 popup.style.display = 'block';
-                popup.innerText = touch && touch.enabled ? 'Tap INTERACT to use' : 'Press E to use';
-            } else if (popup && dist >= 3.0 && (popup.innerText.includes('use') || popup.innerText === '')) {
+                popup.innerText = touch && touch.enabled ? 'TAP TO ENTER' : 'PRESS E TO ENTER';
+            } else if (popup && dist >= 3.0 && (popup.innerText.includes('ENTER') || popup.innerText === '')) {
                 popup.style.display = 'none';
             }
             
@@ -441,8 +441,12 @@ function createObstacle(def) {
             }
           } else {
             if (popup) {
-                popup.style.display = 'block';
-                popup.innerText = touch && touch.enabled ? 'Tap INTERACT to exit, JUMP to fire' : 'Press E to exit, Space to fire';
+                if (touch && touch.enabled) {
+                    popup.style.display = 'block';
+                    popup.innerText = 'EXIT CANNON';
+                } else {
+                    popup.style.display = 'none';
+                }
             }
             
             if (input) {
@@ -538,8 +542,8 @@ function createObstacle(def) {
                   
                   if (ball) {
                     let hit = false;
-                    // Check BVH collisions
-                    if (bvhCollider && bvhCollider.geometry.boundsTree) {
+                    // Check BVH collisions after a 0.1s grace period so it clears the barrel
+                    if (this.life < 5.9 && bvhCollider && bvhCollider.geometry.boundsTree) {
                        const bvh = bvhCollider.geometry.boundsTree;
                        tempMat.copy(bvhCollider.matrixWorld).invert();
                        const localPos = tempVec.copy(ball.position).applyMatrix4(tempMat);

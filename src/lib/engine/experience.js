@@ -28,8 +28,16 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
   if (!interactPopup) {
     interactPopup = document.createElement('div');
     interactPopup.id = 'interact-popup';
-    interactPopup.style.cssText = 'display:none; position:fixed; bottom: 20%; left:50%; transform:translateX(-50%); font-family:sans-serif; background:rgba(0,0,0,0.7); color:white; padding:12px 24px; border-radius:8px; z-index:20; font-weight:bold; pointer-events:none; font-size:1.2rem; text-transform:uppercase; border: 2px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+    interactPopup.style.cssText = 'display:none; position:fixed; bottom: 20%; left:50%; transform:translateX(-50%); font-family:sans-serif; background:rgba(0,0,0,0.7); color:white; padding:12px 24px; border-radius:8px; z-index:20; font-weight:bold; pointer-events:auto; cursor:pointer; font-size:1.2rem; text-transform:uppercase; border: 2px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
     document.body.appendChild(interactPopup);
+
+    interactPopup.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (touch && touch.enabled) {
+        touch.state.interact = true;
+        setTimeout(() => { touch.state.interact = false; }, 100);
+      }
+    });
   }
 
   buildLighting(scene);

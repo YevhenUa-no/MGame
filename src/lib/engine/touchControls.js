@@ -40,20 +40,12 @@ export function createTouchControls() {
         <div class="joystick-knob"></div>
       </div>
     </div>
-    <div class="touch-action-buttons">
-      <button type="button" class="touch-btn jump-btn" aria-label="Tap to jump">JUMP</button>
-      <button type="button" class="touch-btn run-btn" aria-label="Hold to run">RUN</button>
-      <button type="button" class="touch-btn interact-btn" aria-label="Tap to interact">INTERACT</button>
-    </div>
   `;
   document.body.appendChild(root);
 
   const zone = root.querySelector('.joystick-zone');
   const base = root.querySelector('.joystick-base');
   const knob = root.querySelector('.joystick-knob');
-  const runBtn = root.querySelector('.run-btn');
-  const jumpBtn = root.querySelector('.jump-btn');
-  const interactBtn = root.querySelector('.interact-btn');
 
   let activeTouchId = null;
   let originX = 0;
@@ -78,9 +70,6 @@ export function createTouchControls() {
   }
 
   function onTouchStart(event) {
-    // Only claim the first touch that lands in the joystick zone — a
-    // second finger elsewhere (camera look) is handled independently by
-    // cameraRig.js's own pointer listeners on the canvas.
     if (activeTouchId !== null) return;
     const touch = event.changedTouches[0];
     activeTouchId = touch.identifier;
@@ -108,9 +97,6 @@ export function createTouchControls() {
     }
     setKnobOffset(dx, dy);
 
-    // Screen-space drag maps directly to the same moveX/moveZ contract
-    // WASD writes: dragging the knob up (toward the horizon) should move
-    // the player forward, matching KeyW's moveZ = -1.
     state.moveX = dx / MAX_RADIUS;
     state.moveZ = -dy / MAX_RADIUS;
   }
@@ -126,28 +112,27 @@ export function createTouchControls() {
   zone.addEventListener('touchend', onTouchEnd, { passive: true });
   zone.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
-  function bindHoldButton(button, key) {
-    const press = (event) => {
-      event.preventDefault();
-      state[key] = true;
-    };
-    const release = () => {
-      state[key] = false;
-    };
-    button.addEventListener('touchstart', press, { passive: false });
-    button.addEventListener('touchend', release, { passive: true });
-    button.addEventListener('touchcancel', release, { passive: true });
+  function onGlobalTouchStart(e) {
+    if (e.target.closest('.joystick-zone') || e.target.closest('#interact-popup')) return;
+    state.jump = true;
   }
 
-  bindHoldButton(runBtn, 'run');
-  bindHoldButton(jumpBtn, 'jump');
-  bindHoldButton(interactBtn, 'interact');
+  function onGlobalTouchEnd(e) {
+    state.jump = false;
+  }
+
+  window.addEventListener('touchstart', onGlobalTouchStart, { passive: true });
+  window.addEventListener('touchend', onGlobalTouchEnd, { passive: true });
+  window.addEventListener('touchcancel', onGlobalTouchEnd, { passive: true });
 
   function dispose() {
     resetJoystick();
     state.run = false;
     state.jump = false;
     state.interact = false;
+    window.removeEventListener('touchstart', onGlobalTouchStart);
+    window.removeEventListener('touchend', onGlobalTouchEnd);
+    window.removeEventListener('touchcancel', onGlobalTouchEnd);
     root.remove();
   }
 
