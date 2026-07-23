@@ -200,7 +200,7 @@ export function spawnCannonball(worldScene, cannonObj) {
            
            if (p && p.mesh && !p.activeCannon) {
               const dist = p.mesh.position.distanceTo(ball.position);
-              if (dist < 4.0) {
+              if (dist < 2.0) {
                  const dir = new THREE.Vector3().subVectors(p.mesh.position, ball.position);
                  dir.y = 0;
                  if (dir.lengthSq() < 0.001) dir.set(0, 0, 1);
@@ -313,7 +313,6 @@ export function buildWorld(scene) {
     { type: 'rocks-ramp', pos: [-9.47, 0, -1.1] },
     { type: 'firing-cannon', pos: [-11.92, 0, 3.02], scale: [0.673, 0.67, 0.707] },
     { type: 'structure-platform', pos: [11.81, 0.26, -10.74], scale: [1, 1, 0.991], rot: [0.009, -0.129, 0.301] },
-    { type: 'firing-cannon', pos: [10.37, 2.68, -5.35], scale: [1, 1, 0.922], rot: [-0.228, -0.836, -0.008] },
     { type: 'ship-pirate-large', pos: [14.56, 0, -8.93] },
     { type: 'cargo-pile-a', pos: [12.63, 0.22, -5.11], scale: [3.402, 2.051, 2.375] },
     { type: 'cargo-pile-b', pos: [13.54, 0.92, -6.43] },
@@ -323,9 +322,9 @@ export function buildWorld(scene) {
     { type: 'hole', pos: [6.05, 0, -14.92] },
     { type: 'palm-detailed-straight', pos: [7.9, 0, -17.31] },
     { type: 'rocks-a', pos: [12.81, -0.56, -7.67] },
-    { type: 'cargo-pile-a', pos: [10.84, 0.22, -5.1], scale: [3.402, 2.051, 2.375] }
+    { type: 'cargo-pile-a', pos: [10.84, 0.22, -5.1], scale: [3.402, 2.051, 2.375] },
+    { type: 'firing-cannon', pos: [10.21, 2.61, -5.14], scale: [0.673, 0.67, 0.707], rot: -0.887 }
   ];
-
 
 
   for (const def of obstacleDefs) {
@@ -618,7 +617,7 @@ function createObstacle(def) {
             }
 
             if (!this.landingCircle) {
-              const circleGeo = new THREE.RingGeometry(3.5, 4.0, 32);
+              const circleGeo = new THREE.RingGeometry(1.75, 2.0, 32);
               const circleMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
               this.landingCircle = new THREE.Mesh(circleGeo, circleMat);
               this.landingCircle.rotation.x = -Math.PI / 2;
