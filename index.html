@@ -12,6 +12,11 @@
     />
   </head>
   <body>
+    <div id="loading-screen" style="position:fixed;inset:0;background:#291e17;color:#fbf0dd;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;font-family:'Nunito Sans',sans-serif;transition:opacity 0.5s ease;">
+      <div style="width:48px;height:48px;border:4px solid rgba(251,240,221,0.2);border-top-color:#fbf0dd;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px;"></div>
+      <div style="font-size:1.2rem;font-weight:600;letter-spacing:0.1em;">LOADING WORLD...</div>
+      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    </div>
     <canvas class="experience-canvas"></canvas>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
