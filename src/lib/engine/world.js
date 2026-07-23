@@ -575,9 +575,7 @@ function createObstacle(def) {
               }
             }
             
-            this.mesh.rotation.order = 'YXZ';
-            this.mesh.rotation.set(this.pitch, this.yaw, 0);
-
+            // Mesh rotation moved to the end of the update loop
             // Move player to align with cannon
             if (player && player.mesh) {
                const playerOffset = new THREE.Vector3(0, 0, -1.0).applyMatrix4(new THREE.Matrix4().extractRotation(this.mesh.matrixWorld));
@@ -633,6 +631,8 @@ function createObstacle(def) {
             this.prevInteract = interactPressed;
             this.prevJump = jumpPressed;
           }
+          this.mesh.rotation.order = 'YXZ';
+          this.mesh.rotation.set(this.pitch, this.yaw, 0);
         }
       };
       updatables.push(cannonObj);

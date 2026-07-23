@@ -132,13 +132,13 @@ export function createRemotePlayers(scene) {
            mesh.position.y = 0;
            mesh.rotation.y = cannon.yaw;
            
-           if (mesh.archerData && mesh.archerData.mixer) {
-               mesh.archerData.mixer.update(deltaTime);
-               const targetAction = mesh.archerData.actions['idle'];
-               if (targetAction && targetAction !== mesh.archerData.currentAction) {
+           if (mesh.archerData && mesh.archerData.archerMixer) {
+               mesh.archerData.archerMixer.update(deltaTime);
+               const targetAction = mesh.archerData.archerActions['idle'];
+               if (targetAction && targetAction !== mesh.archerData.currentArcherAction) {
                    targetAction.reset().fadeIn(0.2).play();
-                   if (mesh.archerData.currentAction) mesh.archerData.currentAction.crossFadeTo(targetAction, 0.2, true);
-                   mesh.archerData.currentAction = targetAction;
+                   if (mesh.archerData.currentArcherAction) mesh.archerData.currentArcherAction.crossFadeTo(targetAction, 0.2, true);
+                   mesh.archerData.currentArcherAction = targetAction;
                }
            }
            continue;
@@ -157,8 +157,8 @@ export function createRemotePlayers(scene) {
       const verticalSpeed = entry.targetVertSpeed || 0;
       const isGrounded = verticalSpeed < 2.0;
 
-      if (mesh.archerData && mesh.archerData.mixer) {
-          mesh.archerData.mixer.update(deltaTime);
+      if (mesh.archerData && mesh.archerData.archerMixer) {
+          mesh.archerData.archerMixer.update(deltaTime);
           let targetActionName = 'idle';
           if (!isGrounded) {
               targetActionName = 'jump';
@@ -168,11 +168,11 @@ export function createRemotePlayers(scene) {
               targetActionName = 'walk';
           }
 
-          const targetAction = mesh.archerData.actions[targetActionName] || mesh.archerData.actions['idle'];
-          if (targetAction && targetAction !== mesh.archerData.currentAction) {
+          const targetAction = mesh.archerData.archerActions[targetActionName] || mesh.archerData.archerActions['idle'];
+          if (targetAction && targetAction !== mesh.archerData.currentArcherAction) {
               targetAction.reset().fadeIn(0.2).play();
-              if (mesh.archerData.currentAction) mesh.archerData.currentAction.crossFadeTo(targetAction, 0.2, true);
-              mesh.archerData.currentAction = targetAction;
+              if (mesh.archerData.currentArcherAction) mesh.archerData.currentArcherAction.crossFadeTo(targetAction, 0.2, true);
+              mesh.archerData.currentArcherAction = targetAction;
           }
       } else {
           animateAvatar(mesh, deltaTime, isGrounded, speed);
