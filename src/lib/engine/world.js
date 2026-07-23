@@ -105,11 +105,125 @@ const PALETTE = {
  *     against ONE BVH-accelerated geometry instead of walking N meshes,
  *     which is the single biggest performance win in this whole template.
  */
-const updatables = [];
+export const updatables = [];
+export const cannons = [];
+
+export function spawnCannonball(worldScene, cannonObj) {
+  let ball;
+  if (gltfCache['cannon-ball']) {
+    ball = SkeletonUtils.clone(gltfCache['cannon-ball']);
+  } else {
+    const ballGeo = new THREE.SphereGeometry(0.18, 16, 16);
+    const ballMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.2 });
+    ball = new THREE.Mesh(ballGeo, ballMat);
+  }
+  
+  const startOffset = new THREE.Vector3(0, 0.6, 0.6);
+  ball.position.copy(startOffset);
+  ball.applyMatrix4(cannonObj.mesh.matrixWorld);
+  
+  const velocity = new THREE.Vector3(0, 0.5, 1).applyQuaternion(cannonObj.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize().multiplyScalar(15);
+  worldScene.add(ball);
+
+  const maxTrailPoints = 60;
+  const trailGeo = new THREE.BufferGeometry();
+  const trailPositions = new Float32Array(maxTrailPoints * 3);
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+  const trailMat = new THREE.LineBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.6 });
+  const trailLine = new THREE.Line(trailGeo, trailMat);
+  worldScene.add(trailLine);
+  let trailCount = 0;
+  
+  const tempMat = new THREE.Matrix4();
+  const tempVec = new THREE.Vector3();
+  const tempVec2 = new THREE.Vector3();
+
+  updatables.push({
+    life: 6,
+    update: function(bdt, ws, arr, idx, p, i, bvhCollider) {
+      this.life -= bdt;
+      if (this.life <= 0) {
+        if (ball && ball.parent) ws.remove(ball);
+        ws.remove(trailLine);
+        trailGeo.dispose();
+        trailMat.dispose();
+        this.dead = true;
+        return;
+      }
+      
+      if (ball) {
+        let hit = false;
+        if (this.life < 5.9 && bvhCollider && bvhCollider.geometry.boundsTree) {
+           const bvh = bvhCollider.geometry.boundsTree;
+           tempMat.copy(bvhCollider.matrixWorld).invert();
+           const localPos = tempVec.copy(ball.position).applyMatrix4(tempMat);
+           bvh.shapecast({
+              intersectsBounds: box => box.distanceToPoint(localPos) <= 0.18,
+              intersectsTriangle: tri => {
+                 const d = tri.closestPointToPoint(localPos, tempVec2).distanceTo(localPos);
+                 if (d <= 0.18) { hit = true; return true; }
+                 return false;
+              }
+           });
+        }
+
+        if (hit || ball.position.y < 0) {
+           const expGeo = new THREE.BufferGeometry();
+           const pData = new Float32Array(50 * 3);
+           for(let p=0;p<150;p+=3) {
+              const theta = Math.random() * Math.PI * 2;
+              const phi = Math.acos((Math.random() * 2) - 1);
+              const r = Math.random();
+              pData[p] = r * Math.sin(phi) * Math.cos(theta);
+              pData[p+1] = r * Math.sin(phi) * Math.sin(theta);
+              pData[p+2] = r * Math.cos(phi);
+           }
+           expGeo.setAttribute('position', new THREE.BufferAttribute(pData, 3));
+           const expMat = new THREE.PointsMaterial({color:0xffaa00, size:0.4, transparent:true});
+           const exp = new THREE.Points(expGeo, expMat);
+           exp.position.copy(ball.position);
+           ws.add(exp);
+           
+           arr.push({
+              life: 0.5,
+              update: function(edt, ews) {
+                 this.life -= edt;
+                 if (this.life <= 0) {
+                    ews.remove(exp); expGeo.dispose(); expMat.dispose(); this.dead = true;
+                 } else {
+                    const s = 1 + (0.5 - this.life) * 8;
+                    exp.scale.set(s,s,s);
+                    exp.material.opacity = this.life * 2;
+                 }
+              }
+           });
+           
+           if (ball.parent) ws.remove(ball);
+           ball = null;
+        } else {
+           velocity.y -= 20 * bdt;
+           ball.position.addScaledVector(velocity, bdt);
+           
+           if (trailCount < maxTrailPoints) {
+             trailPositions[trailCount * 3] = ball.position.x;
+             trailPositions[trailCount * 3 + 1] = ball.position.y;
+             trailPositions[trailCount * 3 + 2] = ball.position.z;
+             trailCount++;
+             trailLine.geometry.setDrawRange(0, trailCount);
+             trailLine.geometry.attributes.position.needsUpdate = true;
+           }
+        }
+      } else {
+        trailLine.material.opacity = Math.max(0, trailLine.material.opacity - (bdt / 4));
+      }
+    }
+  });
+}
 
 export function buildWorld(scene) {
   // Clear any existing updatables if buildWorld is called again
   updatables.length = 0;
+  cannons.length = 0;
   const group = new THREE.Group();
   group.name = 'world';
   scene.add(group);
@@ -401,7 +515,7 @@ function createObstacle(def) {
       }
       baseY = 0;
 
-      updatables.push({
+      const cannonObj = {
         timer: 0,
         mesh: mesh,
         prevInteract: false,
@@ -410,7 +524,7 @@ function createObstacle(def) {
         pitch: 0,
         trajectoryLine: null,
         
-        update: function(dt, worldScene, arr, idx, player, input, collider, touch) {
+        update: function(dt, worldScene, arr, idx, player, input, collider, touch, network) {
           if (this.timer > 0) this.timer -= dt;
 
           const interactPressed = input && input.interact;
@@ -428,8 +542,8 @@ function createObstacle(def) {
             
             if (popup && dist < 3.0) {
                 popup.style.display = 'block';
-                popup.innerText = touch && touch.enabled ? 'TAP TO ENTER' : 'PRESS E TO ENTER';
-            } else if (popup && dist >= 3.0 && (popup.innerText.includes('ENTER') || popup.innerText === '')) {
+                popup.innerText = touch && touch.enabled ? 'FIRE' : 'PRESS E TO ENTER';
+            } else if (popup && dist >= 3.0 && (popup.innerText.includes('ENTER') || popup.innerText === 'FIRE' || popup.innerText === '')) {
                 popup.style.display = 'none';
             }
             
@@ -438,6 +552,7 @@ function createObstacle(def) {
                 const euler = new THREE.Euler().setFromQuaternion(this.mesh.getWorldQuaternion(new THREE.Quaternion()), 'YXZ');
                 this.yaw = euler.y;
                 this.pitch = euler.x;
+                if (network) network.sendCannonState(cannons.indexOf(this), this.pitch, this.yaw);
             }
           } else {
             if (popup) {
@@ -450,9 +565,14 @@ function createObstacle(def) {
             }
             
             if (input) {
+              const oldPitch = this.pitch;
+              const oldYaw = this.yaw;
               this.yaw -= input.moveX * 1.5 * dt;
               this.pitch -= input.moveZ * 1.5 * dt;
               this.pitch = Math.max(-Math.PI / 4, Math.min(Math.PI / 4, this.pitch));
+              if ((this.pitch !== oldPitch || this.yaw !== oldYaw) && network) {
+                 network.sendCannonState(cannons.indexOf(this), this.pitch, this.yaw);
+              }
             }
             
             this.mesh.rotation.order = 'YXZ';
@@ -498,122 +618,14 @@ function createObstacle(def) {
 
             if (jumpJustPressed && this.timer <= 0) {
               this.timer = 1.0;
-              let ball;
-              if (gltfCache['cannon-ball']) {
-                ball = SkeletonUtils.clone(gltfCache['cannon-ball']);
-              } else {
-                const ballGeo = new THREE.SphereGeometry(0.18, 16, 16);
-                const ballMat = new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.9, roughness: 0.2 });
-                ball = new THREE.Mesh(ballGeo, ballMat);
-              }
-              
-              const startOffset = new THREE.Vector3(0, 0.6, 0.6);
-              ball.position.copy(startOffset);
-              ball.applyMatrix4(this.mesh.matrixWorld);
-              
-              const velocity = new THREE.Vector3(0, 0.5, 1).applyQuaternion(this.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize().multiplyScalar(15);
-              worldScene.add(ball);
-
-              const maxTrailPoints = 60;
-              const trailGeo = new THREE.BufferGeometry();
-              const trailPositions = new Float32Array(maxTrailPoints * 3);
-              trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-              const trailMat = new THREE.LineBasicMaterial({ color: 0xffaaaa, transparent: true, opacity: 0.6 });
-              const trailLine = new THREE.Line(trailGeo, trailMat);
-              worldScene.add(trailLine);
-              let trailCount = 0;
-              
-              const tempMat = new THREE.Matrix4();
-              const tempVec = new THREE.Vector3();
-              const tempVec2 = new THREE.Vector3();
-
-              updatables.push({
-                life: 6,
-                update: function(bdt, ws, arr, idx, p, i, bvhCollider) {
-                  this.life -= bdt;
-                  if (this.life <= 0) {
-                    if (ball && ball.parent) ws.remove(ball);
-                    ws.remove(trailLine);
-                    trailGeo.dispose();
-                    trailMat.dispose();
-                    this.dead = true;
-                    return;
-                  }
-                  
-                  if (ball) {
-                    let hit = false;
-                    // Check BVH collisions after a 0.1s grace period so it clears the barrel
-                    if (this.life < 5.9 && bvhCollider && bvhCollider.geometry.boundsTree) {
-                       const bvh = bvhCollider.geometry.boundsTree;
-                       tempMat.copy(bvhCollider.matrixWorld).invert();
-                       const localPos = tempVec.copy(ball.position).applyMatrix4(tempMat);
-                       bvh.shapecast({
-                          intersectsBounds: box => box.distanceToPoint(localPos) <= 0.18,
-                          intersectsTriangle: tri => {
-                             const d = tri.closestPointToPoint(localPos, tempVec2).distanceTo(localPos);
-                             if (d <= 0.18) { hit = true; return true; }
-                             return false;
-                          }
-                       });
-                    }
-
-                    if (hit || ball.position.y < 0) {
-                       // Explode
-                       const expGeo = new THREE.BufferGeometry();
-                       const pData = new Float32Array(50 * 3);
-                       for(let p=0;p<150;p+=3) {
-                          const theta = Math.random() * Math.PI * 2;
-                          const phi = Math.acos((Math.random() * 2) - 1);
-                          const r = Math.random();
-                          pData[p] = r * Math.sin(phi) * Math.cos(theta);
-                          pData[p+1] = r * Math.sin(phi) * Math.sin(theta);
-                          pData[p+2] = r * Math.cos(phi);
-                       }
-                       expGeo.setAttribute('position', new THREE.BufferAttribute(pData, 3));
-                       const expMat = new THREE.PointsMaterial({color:0xffaa00, size:0.4, transparent:true});
-                       const exp = new THREE.Points(expGeo, expMat);
-                       exp.position.copy(ball.position);
-                       ws.add(exp);
-                       
-                       arr.push({
-                          life: 0.5,
-                          update: function(edt, ews) {
-                             this.life -= edt;
-                             if (this.life <= 0) {
-                                ews.remove(exp); expGeo.dispose(); expMat.dispose(); this.dead = true;
-                             } else {
-                                const s = 1 + (0.5 - this.life) * 8;
-                                exp.scale.set(s,s,s);
-                                exp.material.opacity = this.life * 2;
-                             }
-                          }
-                       });
-                       
-                       if (ball.parent) ws.remove(ball);
-                       ball = null;
-                    } else {
-                       velocity.y -= 20 * bdt;
-                       ball.position.addScaledVector(velocity, bdt);
-                       
-                       if (trailCount < maxTrailPoints) {
-                         trailPositions[trailCount * 3] = ball.position.x;
-                         trailPositions[trailCount * 3 + 1] = ball.position.y;
-                         trailPositions[trailCount * 3 + 2] = ball.position.z;
-                         trailCount++;
-                         trailLine.geometry.setDrawRange(0, trailCount);
-                         trailLine.geometry.attributes.position.needsUpdate = true;
-                       }
-                    }
-                  } else {
-                    trailLine.material.opacity = Math.max(0, trailLine.material.opacity - (bdt / 4));
-                  }
-                }
-              });
+              if (network) network.sendCannonFire(cannons.indexOf(this));
+              spawnCannonball(worldScene, this);
             }
 
             if (interactJustPressed) {
               player.activeCannon = null;
               if (popup) popup.style.display = 'none';
+              if (network) network.sendCannonState(255, 0, 0); // 255 means exit
             }
           }
 
@@ -622,7 +634,9 @@ function createObstacle(def) {
             this.prevJump = jumpPressed;
           }
         }
-      });
+      };
+      updatables.push(cannonObj);
+      cannons.push(cannonObj);
       break;
     }
 

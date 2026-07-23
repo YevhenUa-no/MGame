@@ -56,10 +56,19 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
   const remotePlayers = createRemotePlayers(scene);
   const network = createNetwork({
     url: resolveServerUrl(),
+    onWelcome: (id, color) => {
+        player.mesh.traverse(child => {
+            if (child.isMesh && child.material && child.material.name !== 'Outline') {
+                child.material.color.setRGB(color[0]/255, color[1]/255, color[2]/255);
+            }
+        });
+    },
     onJoin: (data) => remotePlayers.addOrUpdate(data),
     onState: (data) => remotePlayers.addOrUpdate(data),
     onLeave: (id) => remotePlayers.remove(id),
-    onEmoji: (id, index) => remotePlayers.showEmoji(id, index)
+    onEmoji: (id, index) => remotePlayers.showEmoji(id, index),
+    onCannonState: (data) => remotePlayers.updateCannonState(data),
+    onCannonFire: (data) => remotePlayers.fireCannon(data)
   });
   network.connect();
 
@@ -99,7 +108,7 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
 
     for (let i = updatables.length - 1; i >= 0; i--) {
         const u = updatables[i];
-        u.update(frameDelta, scene, updatables, i, player, mergedInput, collider, touch);
+        u.update(frameDelta, scene, updatables, i, player, mergedInput, collider, touch, network);
         if (u.dead) updatables.splice(i, 1);
     }
 

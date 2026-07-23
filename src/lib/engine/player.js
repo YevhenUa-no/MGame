@@ -487,7 +487,13 @@ export function applyArcherToMesh(mesh, targetObj = null) {
     
     archerModel.traverse((child) => {
         if (child.isMesh && child.material) {
-            child.material.map = kenneyTex;
+            child.material = child.material.clone();
+            child.material.map = new THREE.TextureLoader().load('/models/kenney/Textures/colormap.png');
+            child.material.map.colorSpace = THREE.SRGBColorSpace;
+            child.material.map.flipY = false;
+            if (mesh.multiplayerColor) {
+                child.material.color.setRGB(mesh.multiplayerColor[0]/255, mesh.multiplayerColor[1]/255, mesh.multiplayerColor[2]/255);
+            }
             child.material.needsUpdate = true;
         }
     });

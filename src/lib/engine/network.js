@@ -3,7 +3,7 @@
 // here touches Three.js — remotePlayers.js is what turns these callbacks
 // into meshes, keeping "networking" and "rendering other players" as two
 // separate, independently testable concerns.
-const OPCODE = { STATE: 0, JOIN: 1, LEAVE: 2, EMOJI: 3, WELCOME: 4 };
+const OPCODE = { STATE: 0, JOIN: 1, LEAVE: 2, EMOJI: 3, WELCOME: 4, CANNON_STATE: 5, CANNON_FIRE: 6 };
 
 /**
  * @param {object} opts
@@ -13,8 +13,10 @@ const OPCODE = { STATE: 0, JOIN: 1, LEAVE: 2, EMOJI: 3, WELCOME: 4 };
  * @param {(id:number) => void} [opts.onLeave]
  * @param {(data:{id,x,y,z,rotY}) => void} [opts.onState]
  * @param {(id:number, emojiIndex:number) => void} [opts.onEmoji]
+ * @param {(data:{id,cannonIndex,pitch,yaw}) => void} [opts.onCannonState]
+ * @param {(data:{id,cannonIndex}) => void} [opts.onCannonFire]
  */
-export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoji }) {
+export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoji, onCannonState, onCannonFire }) {
   let ws = null;
   let myId = null;
   let connected = false;
@@ -81,6 +83,22 @@ export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoj
           onEmoji?.(view.getUint8(1), view.getUint8(2));
           break;
         }
+        case OPCODE.CANNON_STATE: {
+          onCannonState?.({
+            id: view.getUint8(1),
+            cannonIndex: view.getUint8(2),
+            pitch: view.getFloat32(3, true),
+            yaw: view.getFloat32(7, true)
+          });
+          break;
+        }
+        case OPCODE.CANNON_FIRE: {
+          onCannonFire?.({
+            id: view.getUint8(1),
+            cannonIndex: view.getUint8(2)
+          });
+          break;
+        }
       }
     });
   }
@@ -107,6 +125,26 @@ export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoj
     ws.send(buf);
   }
 
+  function sendCannonState(cannonIndex, pitch, yaw) {
+    if (!connected) return;
+    const buf = new ArrayBuffer(10);
+    const view = new DataView(buf);
+    view.setUint8(0, OPCODE.CANNON_STATE);
+    view.setUint8(1, cannonIndex);
+    view.setFloat32(2, pitch, true);
+    view.setFloat32(6, yaw, true);
+    ws.send(buf);
+  }
+
+  function sendCannonFire(cannonIndex) {
+    if (!connected) return;
+    const buf = new ArrayBuffer(2);
+    const view = new DataView(buf);
+    view.setUint8(0, OPCODE.CANNON_FIRE);
+    view.setUint8(1, cannonIndex);
+    ws.send(buf);
+  }
+
   function dispose() {
     ws?.close();
   }
@@ -115,6 +153,8 @@ export function createNetwork({ url, onWelcome, onJoin, onLeave, onState, onEmoj
     connect,
     sendState,
     sendEmoji,
+    sendCannonState,
+    sendCannonFire,
     dispose,
     get id() {
       return myId;

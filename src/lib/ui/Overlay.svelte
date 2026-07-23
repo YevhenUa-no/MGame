@@ -2,21 +2,13 @@
   import { onMount } from 'svelte';
   import gsap from 'gsap';
 
-  let cornerEl;
   let isTouch = false;
-
   onMount(() => {
     isTouch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
-
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    tl.from(cornerEl, { y: -16, opacity: 0, duration: 0.7 });
   });
 </script>
 
 <div class="hud" class:touch-mode={isTouch}>
-  <div class="hud-corner" bind:this={cornerEl}>
-    <span class="eyebrow">a quiet clearing</span>
-  </div>
 </div>
 
 <style>

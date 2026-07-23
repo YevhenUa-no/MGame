@@ -18,7 +18,9 @@ const OPCODE = {
   JOIN: 1, // server -> client: a player entered the room
   LEAVE: 2, // server -> client: a player left the room
   EMOJI: 3, // either direction: a one-shot emoji "wave"
-  WELCOME: 4 // server -> client only, sent once on connect
+  WELCOME: 4, // server -> client only, sent once on connect
+  CANNON_STATE: 5, // either direction: aiming a cannon
+  CANNON_FIRE: 6 // either direction: firing a cannon
 };
 
 // Session-local ids (1 byte = up to 255 concurrent players per room, plenty
@@ -92,6 +94,14 @@ wss.on('connection', (ws, req) => {
     } else if (opcode === OPCODE.EMOJI && data.length >= 2) {
       const emojiIndex = data.readUInt8(1);
       broadcast(room, ws, encodeEmoji(player.id, emojiIndex));
+    } else if (opcode === OPCODE.CANNON_STATE && data.length >= 9) {
+      const cannonIndex = data.readUInt8(1);
+      const pitch = safeFloat(data.readFloatLE(2));
+      const yaw = safeFloat(data.readFloatLE(6));
+      broadcast(room, ws, encodeCannonState(player.id, cannonIndex, pitch, yaw));
+    } else if (opcode === OPCODE.CANNON_FIRE && data.length >= 2) {
+      const cannonIndex = data.readUInt8(1);
+      broadcast(room, ws, encodeCannonFire(player.id, cannonIndex));
     }
   });
 
@@ -169,6 +179,24 @@ function encodeEmoji(id, emojiIndex) {
   buf.writeUInt8(OPCODE.EMOJI, 0);
   buf.writeUInt8(id, 1);
   buf.writeUInt8(emojiIndex, 2);
+  return buf;
+}
+
+function encodeCannonState(id, cannonIndex, pitch, yaw) {
+  const buf = Buffer.alloc(11);
+  buf.writeUInt8(OPCODE.CANNON_STATE, 0);
+  buf.writeUInt8(id, 1);
+  buf.writeUInt8(cannonIndex, 2);
+  buf.writeFloatLE(pitch, 3);
+  buf.writeFloatLE(yaw, 7);
+  return buf;
+}
+
+function encodeCannonFire(id, cannonIndex) {
+  const buf = Buffer.alloc(3);
+  buf.writeUInt8(OPCODE.CANNON_FIRE, 0);
+  buf.writeUInt8(id, 1);
+  buf.writeUInt8(cannonIndex, 2);
   return buf;
 }
 

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { buildCharacterModel, animateAvatar, applyArcherToMesh } from './player.js';
+import { cannons, spawnCannonball } from './world.js';
 
 // Same critically-damped-feeling lerp used by cameraRig.js — remote
 // avatars arrive at ~15Hz over the network but should still look like they
@@ -17,11 +18,12 @@ export function createRemotePlayers(scene) {
   group.name = 'remotePlayers';
   scene.add(group);
 
-  // id -> { mesh, target: {x,y,z,rotY}, emojiSprite?, emojiTimeout? }
+  // id -> { mesh, target: {x,y,z,rotY}, targetSpeed, targetVertSpeed, emojiSprite?, emojiTimeout?, cannonIndex? }
   const players = new Map();
 
   function makeAvatar(color) {
     const mesh = buildCharacterModel(color || [200, 200, 200]);
+    mesh.multiplayerColor = color || [200, 200, 200];
     mesh.archerData = { mixer: null, actions: {}, currentAction: null };
     applyArcherToMesh(mesh, mesh.archerData);
     return mesh;
@@ -34,9 +36,16 @@ export function createRemotePlayers(scene) {
       const mesh = makeAvatar(data.color || [200, 200, 200]);
       mesh.position.set(data.x, data.y, data.z);
       group.add(mesh);
-      entry = { mesh, target: { x: data.x, y: data.y, z: data.z, rotY: data.rotY } };
+      entry = { mesh, target: { x: data.x, y: data.y, z: data.z, rotY: data.rotY }, targetSpeed: 0, targetVertSpeed: 0, cannonIndex: 255 };
       players.set(data.id, entry);
     } else {
+      const dx = data.x - entry.target.x;
+      const dy = data.y - entry.target.y;
+      const dz = data.z - entry.target.z;
+      // data arrives roughly every 0.066 seconds (15Hz).
+      entry.targetSpeed = Math.hypot(dx, dz) / 0.066;
+      entry.targetVertSpeed = Math.abs(dy) / 0.066;
+
       entry.target.x = data.x;
       entry.target.y = data.y;
       entry.target.z = data.z;
@@ -57,6 +66,24 @@ export function createRemotePlayers(scene) {
       }
     });
     players.delete(id);
+  }
+
+  function updateCannonState(data) {
+    const entry = players.get(data.id);
+    if (!entry) return;
+    entry.cannonIndex = data.cannonIndex;
+    if (data.cannonIndex !== 255) {
+      const cannon = cannons[data.cannonIndex];
+      if (cannon) {
+        cannon.pitch = data.pitch;
+        cannon.yaw = data.yaw;
+      }
+    }
+  }
+
+  function fireCannon(data) {
+    const cannon = cannons[data.cannonIndex];
+    if (cannon) spawnCannonball(scene, cannon);
   }
 
   /** Renders a canvas-texture sprite above a remote avatar's head. */
@@ -94,10 +121,29 @@ export function createRemotePlayers(scene) {
 
   function update(deltaTime) {
     const t = 1 - Math.exp(-LERP_RATE * deltaTime);
-    for (const { mesh, target } of players.values()) {
-      const prevX = mesh.position.x;
-      const prevY = mesh.position.y;
-      const prevZ = mesh.position.z;
+    for (const entry of players.values()) {
+      const { mesh, target, cannonIndex } = entry;
+
+      if (cannonIndex !== undefined && cannonIndex !== 255) {
+        const cannon = cannons[cannonIndex];
+        if (cannon) {
+           const playerOffset = new THREE.Vector3(0, 0, -1.0).applyMatrix4(new THREE.Matrix4().extractRotation(cannon.mesh.matrixWorld));
+           mesh.position.copy(cannon.mesh.position).add(playerOffset);
+           mesh.position.y = 0;
+           mesh.rotation.y = cannon.yaw;
+           
+           if (mesh.archerData && mesh.archerData.mixer) {
+               mesh.archerData.mixer.update(deltaTime);
+               const targetAction = mesh.archerData.actions['idle'];
+               if (targetAction && targetAction !== mesh.archerData.currentAction) {
+                   targetAction.reset().fadeIn(0.2).play();
+                   if (mesh.archerData.currentAction) mesh.archerData.currentAction.crossFadeTo(targetAction, 0.2, true);
+                   mesh.archerData.currentAction = targetAction;
+               }
+           }
+           continue;
+        }
+      }
 
       mesh.position.x += (target.x - mesh.position.x) * t;
       mesh.position.y += (target.y - mesh.position.y) * t;
@@ -107,11 +153,8 @@ export function createRemotePlayers(scene) {
       if (delta < -Math.PI) delta += Math.PI * 2;
       mesh.rotation.y += delta * t;
 
-      const dx = mesh.position.x - prevX;
-      const dy = mesh.position.y - prevY;
-      const dz = mesh.position.z - prevZ;
-      const speed = Math.hypot(dx, dz) / (deltaTime || 0.016);
-      const verticalSpeed = Math.abs(dy) / (deltaTime || 0.016);
+      const speed = entry.targetSpeed || 0;
+      const verticalSpeed = entry.targetVertSpeed || 0;
       const isGrounded = verticalSpeed < 2.0;
 
       if (mesh.archerData && mesh.archerData.mixer) {
@@ -142,5 +185,5 @@ export function createRemotePlayers(scene) {
     scene.remove(group);
   }
 
-  return { addOrUpdate, remove, showEmoji, update, dispose };
+  return { addOrUpdate, remove, showEmoji, updateCannonState, fireCannon, update, dispose };
 }
