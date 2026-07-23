@@ -83,20 +83,47 @@ export function createCameraRig(camera, domElement, config = {}) {
     return current + THREE.MathUtils.clamp(rate, 0, 1) * diff;
   }
 
-  function update(playerMesh, deltaTime) {
+  function update(targetMesh, deltaTime, isCannonMode = false) {
+    if (isCannonMode) {
+      orbit.enabled = false;
+      
+      const worldQuat = targetMesh.getWorldQuaternion(new THREE.Quaternion());
+      
+      // Position camera behind and slightly above the cannon barrel
+      const offset = new THREE.Vector3(0, 0.8, -1.2);
+      offset.applyQuaternion(worldQuat);
+      _idealOffset.copy(targetMesh.position).add(offset);
+      
+      // Look forward along the barrel
+      const lookAtOffset = new THREE.Vector3(0, 0.8, 10);
+      lookAtOffset.applyQuaternion(worldQuat);
+      _idealLookAt.copy(targetMesh.position).add(lookAtOffset);
+
+      // Fast interpolation to switch into cannon mode smoothly
+      camera.position.lerp(_idealOffset, 1 - Math.pow(0.0001, deltaTime * 2));
+      _currentLookAt.lerp(_idealLookAt, 1 - Math.pow(0.0001, deltaTime * 2));
+      camera.lookAt(_currentLookAt);
+      
+      // Sync the follow state so returning to normal mode doesn't snap wildly
+      const euler = new THREE.Euler().setFromQuaternion(worldQuat, 'YXZ');
+      state.yaw = euler.y + Math.PI;
+      
+      return;
+    }
+
     if (finalConfig.mode === 'follow') {
       orbit.enabled = false;
       
       if (finalConfig.follow.autoAlign && !isDragging) {
-        state.yaw = smoothAngle(state.yaw, playerMesh.rotation.y + Math.PI, finalConfig.follow.autoAlignForce * deltaTime);
+        state.yaw = smoothAngle(state.yaw, targetMesh.rotation.y + Math.PI, finalConfig.follow.autoAlignForce * deltaTime);
       }
       
       _idealOffset
         .set(finalConfig.follow.offsetX, finalConfig.follow.offsetY, finalConfig.follow.offsetZ)
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), state.yaw)
-        .add(playerMesh.position);
+        .add(targetMesh.position);
 
-      _idealLookAt.copy(playerMesh.position).add(new THREE.Vector3(0, 1, 0));
+      _idealLookAt.copy(targetMesh.position).add(new THREE.Vector3(0, 1, 0));
 
       if (!initialized) {
         currentPosition.copy(_idealOffset);

@@ -1,4 +1,21 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+let archerModelTemplate = null;
+let kenneyTex = null;
+
+const gltfLoader = new GLTFLoader();
+const texLoader = new THREE.TextureLoader();
+texLoader.load('/models/kenney/Textures/colormap.png', (tex) => {
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.flipY = false;
+    kenneyTex = tex;
+
+    gltfLoader.load('/models/kenney/character-archer.glb', (gltf) => {
+        archerModelTemplate = gltf;
+    });
+});
 
 export const DEFAULT_PHYSICS_CONFIG = {
   gravity: -80,
@@ -433,7 +450,7 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
     )
   };
 
-  return {
+  const player = {
     mesh,
     capsuleInfo,
     velocity: new THREE.Vector3(),
@@ -447,8 +464,50 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
     // respawn() which now keeps this in sync with the Start Position
     // GUI fields.
     spawnPosition: new THREE.Vector3(...startPos),
-    animationConfig
+    animationConfig,
+    useKenneyArcher: true, // User requested Archer as default
+    archerMixer: null,
+    archerActions: {},
+    currentArcherAction: null
   };
+
+  function applyArcher() {
+      if (!archerModelTemplate || !kenneyTex) {
+          setTimeout(applyArcher, 100);
+          return;
+      }
+      if (!player.useKenneyArcher) return;
+      
+      const archerModel = SkeletonUtils.clone(archerModelTemplate.scene);
+      archerModel.position.y = 0;
+      
+      archerModel.traverse((child) => {
+          if (child.isMesh && child.material) {
+              child.material.map = kenneyTex;
+              child.material.needsUpdate = true;
+          }
+      });
+      
+      if (archerModelTemplate.animations && archerModelTemplate.animations.length > 0) {
+          player.archerMixer = new THREE.AnimationMixer(archerModel);
+          archerModelTemplate.animations.forEach((clip) => {
+              player.archerActions[clip.name.toLowerCase()] = player.archerMixer.clipAction(clip);
+          });
+          const idle = player.archerActions['idle'] || Object.values(player.archerActions)[0];
+          if (idle) {
+              idle.play();
+              player.currentArcherAction = idle;
+          }
+      }
+      
+      mesh.children = [];
+      mesh.add(archerModel);
+      mesh.userData = {}; // Disable procedural animation
+  }
+  
+  applyArcher();
+
+  return player;
 }
 
 /**
@@ -605,7 +664,27 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
 
   // --- 6. Animate Avatar ---------------------------------------------------
   const horizontalSpeed = Math.hypot(velocity.x, velocity.z);
-  animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed, player.animationConfig);
+  
+  if (player.useKenneyArcher && player.archerMixer) {
+      player.archerMixer.update(deltaTime);
+      let targetActionName = 'idle';
+      if (!player.isGrounded) {
+          targetActionName = 'jump';
+      } else if (horizontalSpeed > walkSpeed + 0.1) {
+          targetActionName = 'run';
+      } else if (horizontalSpeed > 0.1) {
+          targetActionName = 'walk';
+      }
+
+      const targetAction = player.archerActions[targetActionName] || player.archerActions['idle'];
+      if (targetAction && targetAction !== player.currentArcherAction) {
+          targetAction.reset().fadeIn(0.2).play();
+          if (player.currentArcherAction) player.currentArcherAction.crossFadeTo(targetAction, 0.2, true);
+          player.currentArcherAction = targetAction;
+      }
+  } else {
+      animateAvatar(mesh, deltaTime, player.isGrounded, horizontalSpeed, player.animationConfig);
+  }
 }
 
 function lerpAngle(current, target, t) {

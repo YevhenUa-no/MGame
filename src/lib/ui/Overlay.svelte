@@ -2,127 +2,20 @@
   import { onMount } from 'svelte';
   import gsap from 'gsap';
 
-  export let onEmoji = () => {};
-
   let cornerEl;
-  let arcEl;
-  let chatMenuEl;
-  let bubbleLayerEl;
-
-  let chatOpen = false;
   let isTouch = false;
-  const emojis = ['👋', '🌿', '☀️', '🍃', '💤', '✨'];
 
   onMount(() => {
     isTouch = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
 
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    tl.from(cornerEl, { y: -16, opacity: 0, duration: 0.7 })
-      .from(
-        arcEl.children,
-        { y: 24, opacity: 0, duration: 0.55, stagger: 0.08 },
-        '-=0.35'
-      );
-
-    gsap.set(chatMenuEl, { opacity: 0, scale: 0.85, transformOrigin: '50% 100%', pointerEvents: 'none' });
+    tl.from(cornerEl, { y: -16, opacity: 0, duration: 0.7 });
   });
-
-  function toggleChat() {
-    chatOpen = !chatOpen;
-    if (chatOpen) {
-      gsap.to(chatMenuEl, {
-        opacity: 1,
-        scale: 1,
-        duration: 0.45,
-        ease: 'back.out(1.7)',
-        onStart: () => (chatMenuEl.style.pointerEvents = 'auto')
-      });
-    } else {
-      gsap.to(chatMenuEl, {
-        opacity: 0,
-        scale: 0.85,
-        duration: 0.25,
-        ease: 'power2.in',
-        onComplete: () => (chatMenuEl.style.pointerEvents = 'none')
-      });
-    }
-  }
-
-  function sendEmoji(emoji) {
-    spawnFloatingBubble(emoji);
-    onEmoji(emojis.indexOf(emoji));
-    toggleChat();
-  }
-
-  function wave() {
-    spawnFloatingBubble('👋');
-    onEmoji(emojis.indexOf('👋'));
-  }
-
-  /** A little emoji bubble that drifts up and fades out above the action arc. */
-  function spawnFloatingBubble(emoji) {
-    const bubble = document.createElement('span');
-    bubble.className = 'bubble';
-    bubble.textContent = emoji;
-    bubbleLayerEl.appendChild(bubble);
-
-    gsap.fromTo(
-      bubble,
-      { y: 0, opacity: 0, scale: 0.6 },
-      {
-        y: -90,
-        opacity: 1,
-        scale: 1,
-        duration: 0.4,
-        ease: 'back.out(2)',
-        onComplete: () => {
-          gsap.to(bubble, {
-            y: -140,
-            opacity: 0,
-            duration: 0.5,
-            delay: 0.4,
-            ease: 'power1.in',
-            onComplete: () => bubble.remove()
-          });
-        }
-      }
-    );
-  }
 </script>
 
 <div class="hud" class:touch-mode={isTouch}>
   <div class="hud-corner" bind:this={cornerEl}>
     <span class="eyebrow">a quiet clearing</span>
-
-  </div>
-
-  <div class="bubble-layer" bind:this={bubbleLayerEl}></div>
-
-  <div class="chat-menu" bind:this={chatMenuEl} role="menu" aria-label="Emoji menu">
-    {#each emojis as emoji}
-      <button class="emoji-btn" on:click={() => sendEmoji(emoji)} aria-label={`Send ${emoji}`}>
-        {emoji}
-      </button>
-    {/each}
-  </div>
-
-  <!-- The action arc is the HUD's signature element: buttons sit on a gentle
-       upward curve, like a sun cresting the horizon — tying the control
-       cluster back to the golden-hour lighting in lighting.js rather than
-       being just another straight toolbar. -->
-  <div class="action-arc" bind:this={arcEl}>
-    <button
-      class="action-btn"
-      style="--i: 0"
-      on:click={toggleChat}
-      aria-label="Open emoji menu"
-      aria-expanded={chatOpen}
-    >
-      🙂
-    </button>
-    <button class="action-btn primary" style="--i: 1" on:click={wave} aria-label="Wave">
-      👋
-    </button>
   </div>
 </div>
 

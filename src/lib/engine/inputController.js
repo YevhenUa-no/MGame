@@ -9,7 +9,8 @@ const DEFAULT_KEY_MAP = {
   ArrowRight: 'right',
   Space: 'jump',
   ShiftLeft: 'run',
-  ShiftRight: 'run'
+  ShiftRight: 'run',
+  KeyE: 'interact'
 };
 
 /**
@@ -26,7 +27,8 @@ export function createInputController(keyBindings = null) {
     moveX: 0,
     moveZ: 0,
     jump: false,
-    run: false
+    run: false,
+    interact: false
   };
 
   const currentKeyMap = { ...DEFAULT_KEY_MAP };
@@ -37,6 +39,7 @@ export function createInputController(keyBindings = null) {
     if (keyBindings.right) currentKeyMap[keyBindings.right] = 'right';
     if (keyBindings.jump) currentKeyMap[keyBindings.jump] = 'jump';
     if (keyBindings.run) currentKeyMap[keyBindings.run] = 'run';
+    if (keyBindings.interact) currentKeyMap[keyBindings.interact] = 'interact';
   }
 
   // Raw WASD/arrow key state, used only to recompute moveX/moveZ.
@@ -58,6 +61,7 @@ export function createInputController(keyBindings = null) {
     if (!action) return;
     if (action === 'jump') state.jump = true;
     else if (action === 'run') state.run = true;
+    else if (action === 'interact') state.interact = true;
     else {
       keys[action] = true;
       recomputeMove();
@@ -69,6 +73,7 @@ export function createInputController(keyBindings = null) {
     if (!action) return;
     if (action === 'jump') state.jump = false;
     else if (action === 'run') state.run = false;
+    else if (action === 'interact') state.interact = false;
     else {
       keys[action] = false;
       recomputeMove();
@@ -83,6 +88,7 @@ export function createInputController(keyBindings = null) {
     keys.forward = keys.backward = keys.left = keys.right = false;
     state.jump = false;
     state.run = false;
+    state.interact = false;
     recomputeMove();
   }
 

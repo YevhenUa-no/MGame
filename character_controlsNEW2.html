@@ -177,6 +177,7 @@
     import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
     import { MeshBVH, computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'https://esm.sh/three-mesh-bvh';
     import { createPlayer, updatePlayer, animateAvatar, DEFAULT_PHYSICS_CONFIG } from './src/lib/engine/player.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
     // Same BVH prototype patch world.js uses, so any collider mesh we build
     // here (real or fallback) is shapecast-able exactly the way
@@ -203,6 +204,7 @@
     let environmentGroup = null;
     let worldCollider = null;
     let worldBvhHelper = null;
+    let updatables = [];
     // Stand-in passed to updatePlayer() when collisions are toggled off —
     // no boundsTree means it takes the same "no collider" fallback path
     // player.js itself uses when a level has no collider yet.
@@ -241,13 +243,15 @@
 
         try {
             const core = await import('./src/lib/engine/core.js');
-            const world = await import('./src/lib/engine/world.js');
+            const engine = await import('./src/lib/engine/world.js');
+            const { buildWorld } = engine;
+            updatables = engine.updatables;
             const lighting = await import('./src/lib/engine/lighting.js');
 
             const built = core.createCore(canvas);
             scene = built.scene; camera = built.camera; renderer = built.renderer;
             lighting.buildLighting(scene);
-            const { group, collider, bvhHelper } = world.buildWorld(scene); // real level, real obstacles
+            const { group, collider, bvhHelper } = buildWorld(scene); // real level, real obstacles
             environmentGroup = group;
             worldCollider = collider;
             worldBvhHelper = bvhHelper;
@@ -449,6 +453,7 @@
         charHeight: PLAYER_COLLISION_HEIGHT,
         showCollisionBoxes: false,
         showCharCollision: false,
+        useKenneyArcher: true,
     };
 
     rebuildCapsule();
@@ -468,6 +473,66 @@
         player.isGrounded = true;
     }
     respawn();
+
+    // -----------------------------------------------------------------
+    // KENNEY ARCHER SUBSTITUTION
+    // -----------------------------------------------------------------
+    let archerModel = null;
+    let archerMixer = null;
+    const archerActions = {};
+    let currentArcherAction = null;
+    let originalChildren = [...player.mesh.children];
+    let originalUserData = player.mesh.userData;
+
+    const kenneyTex = new THREE.TextureLoader().load('/models/kenney/Textures/colormap.png');
+    kenneyTex.colorSpace = THREE.SRGBColorSpace;
+    kenneyTex.flipY = false;
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('/models/kenney/character-archer.glb', (gltf) => {
+        archerModel = gltf.scene;
+        // The player mesh origin is at the feet (y=0 relative), so no vertical offset is needed.
+        archerModel.position.y = 0;
+
+        archerModel.traverse((child) => {
+            if (child.isMesh && child.material) {
+                child.material.map = kenneyTex;
+                child.material.needsUpdate = true;
+            }
+        });
+        
+        if (gltf.animations && gltf.animations.length > 0) {
+            archerMixer = new THREE.AnimationMixer(archerModel);
+            gltf.animations.forEach((clip) => {
+                archerActions[clip.name.toLowerCase()] = archerMixer.clipAction(clip);
+            });
+            // Try to find idle and play it
+            const idle = archerActions['idle'] || Object.values(archerActions)[0];
+            if (idle) {
+                idle.play();
+                currentArcherAction = idle;
+            }
+        }
+        
+        if (params.useKenneyArcher) {
+            player.mesh.children = [];
+            player.mesh.add(archerModel);
+            player.mesh.userData = {}; // Disable procedural animation
+        }
+    });
+
+    const guiMain = new GUI();
+    guiMain.add(params, 'useKenneyArcher').name('Use Kenney Archer').onChange(v => {
+        if (v && archerModel) {
+            player.mesh.children = [];
+            player.mesh.add(archerModel);
+            player.mesh.userData = {}; // Disable procedural animation
+        } else {
+            player.mesh.children = [];
+            originalChildren.forEach(c => player.mesh.add(c));
+            player.mesh.userData = originalUserData; // Re-enable procedural
+        }
+    });
 
     // -----------------------------------------------------------------
     // CAMERA — Follow: locked third-person chase cam computed from the
@@ -764,6 +829,29 @@
             steps += 1;
         }
 
+        if (params.useKenneyArcher && archerMixer) {
+            archerMixer.update(dt);
+            const horizontalSpeed = Math.hypot(player.velocity.x, player.velocity.z);
+            // Basic animation state machine
+            let targetActionName = null;
+            if (!player.isGrounded) targetActionName = 'jump';
+            else if (horizontalSpeed > 4.5) targetActionName = 'sprint';
+            else if (horizontalSpeed > 0.1) targetActionName = 'walk';
+            else targetActionName = 'idle';
+
+            let targetAction = archerActions[targetActionName];
+            // Fallbacks
+            if (!targetAction && targetActionName === 'sprint') targetAction = archerActions['walk'];
+            if (!targetAction && targetActionName === 'walk') targetAction = archerActions['sprint'];
+            if (!targetAction) targetAction = archerActions['idle'] || Object.values(archerActions)[0];
+
+            if (targetAction && targetAction !== currentArcherAction) {
+                targetAction.reset().fadeIn(0.2).play();
+                if (currentArcherAction) currentArcherAction.crossFadeTo(targetAction, 0.2, true);
+                currentArcherAction = targetAction;
+            }
+        }
+
         if (charCollisionHelper) {
             charCollisionHelper.visible = params.showCharCollision;
             if (params.showCharCollision) {
@@ -772,6 +860,12 @@
                 charCollisionHelper.position.copy(player.mesh.position);
                 charCollisionHelper.position.y += params.charHeight / 2;
             }
+        }
+
+        for (let i = updatables.length - 1; i >= 0; i--) {
+            const u = updatables[i];
+            u.update(dt, scene, updatables, i, player, input.state);
+            if (u.dead) updatables.splice(i, 1);
         }
 
         if (params.autoAlign && !isDraggingCam) {

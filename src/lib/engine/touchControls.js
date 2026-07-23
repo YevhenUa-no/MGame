@@ -22,7 +22,8 @@ export function createTouchControls() {
     moveX: 0,
     moveZ: 0,
     jump: false,
-    run: false
+    run: false,
+    interact: false
   };
 
   if (!isTouchDevice()) {
@@ -42,6 +43,7 @@ export function createTouchControls() {
     <div class="touch-action-buttons">
       <button type="button" class="touch-btn jump-btn" aria-label="Tap to jump">JUMP</button>
       <button type="button" class="touch-btn run-btn" aria-label="Hold to run">RUN</button>
+      <button type="button" class="touch-btn interact-btn" aria-label="Tap to interact">INTERACT</button>
     </div>
   `;
   document.body.appendChild(root);
@@ -51,6 +53,7 @@ export function createTouchControls() {
   const knob = root.querySelector('.joystick-knob');
   const runBtn = root.querySelector('.run-btn');
   const jumpBtn = root.querySelector('.jump-btn');
+  const interactBtn = root.querySelector('.interact-btn');
 
   let activeTouchId = null;
   let originX = 0;
@@ -138,11 +141,13 @@ export function createTouchControls() {
 
   bindHoldButton(runBtn, 'run');
   bindHoldButton(jumpBtn, 'jump');
+  bindHoldButton(interactBtn, 'interact');
 
   function dispose() {
     resetJoystick();
     state.run = false;
     state.jump = false;
+    state.interact = false;
     root.remove();
   }
 

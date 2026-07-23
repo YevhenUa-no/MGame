@@ -4,7 +4,7 @@
 // other engine module below creates or collides against geometry that
 // depends on that patch already being in place.
 import { createCore } from './core.js';
-import { buildWorld } from './world.js';
+import { buildWorld, updatables } from './world.js';
 import { buildLighting } from './lighting.js';
 import { createPlayer, updatePlayer } from './player.js';
 import { createInputController } from './inputController.js';
@@ -22,6 +22,15 @@ const NETWORK_SEND_INTERVAL = 1 / 15;
 
 export function createExperience(canvas, characterConfig = {}, cameraConfig = {}, appearanceConfig = {}, animationConfig = {}) {
   const { scene, camera, renderer, clock, dispose: disposeCore } = createCore(canvas);
+
+  // Setup interact popup UI
+  let interactPopup = document.getElementById('interact-popup');
+  if (!interactPopup) {
+    interactPopup = document.createElement('div');
+    interactPopup.id = 'interact-popup';
+    interactPopup.style.cssText = 'display:none; position:fixed; bottom: 20%; left:50%; transform:translateX(-50%); font-family:sans-serif; background:rgba(0,0,0,0.7); color:white; padding:12px 24px; border-radius:8px; z-index:20; font-weight:bold; pointer-events:none; font-size:1.2rem; text-transform:uppercase; border: 2px solid rgba(255,255,255,0.2); backdrop-filter:blur(4px); box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+    document.body.appendChild(interactPopup);
+  }
 
   buildLighting(scene);
   const { collider } = buildWorld(scene);
@@ -60,7 +69,8 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
       moveX: (Math.abs(touch.state.moveX) > 0.01 ? touch.state.moveX : input.state.moveX) || 0,
       moveZ: (Math.abs(touch.state.moveZ) > 0.01 ? touch.state.moveZ : input.state.moveZ) || 0,
       jump: !!(touch.state.jump || input.state.jump),
-      run: !!(touch.state.run || input.state.run)
+      run: !!(touch.state.run || input.state.run),
+      interact: !!(touch.state.interact || input.state.interact)
     };
 
     // Fixed-timestep physics substeps decoupled from render framerate: this
@@ -69,13 +79,21 @@ export function createExperience(canvas, characterConfig = {}, cameraConfig = {}
     // for a hand-tuned "cozy" movement feel.
     let steps = 0;
     while (accumulator >= FIXED_TIMESTEP && steps < MAX_SUBSTEPS) {
-      updatePlayer(player, collider, mergedInput, cameraRig.yaw, FIXED_TIMESTEP);
+      if (!player.activeCannon) {
+        updatePlayer(player, collider, mergedInput, cameraRig.yaw, FIXED_TIMESTEP);
+      }
       accumulator -= FIXED_TIMESTEP;
       steps += 1;
     }
 
-    cameraRig.update(player.mesh, frameDelta);
+    cameraRig.update(player.activeCannon ? player.activeCannon.mesh : player.mesh, frameDelta, !!player.activeCannon);
     remotePlayers.update(frameDelta);
+
+    for (let i = updatables.length - 1; i >= 0; i--) {
+        const u = updatables[i];
+        u.update(frameDelta, scene, updatables, i, player, mergedInput, collider, touch);
+        if (u.dead) updatables.splice(i, 1);
+    }
 
     networkAccumulator += frameDelta;
     if (networkAccumulator >= NETWORK_SEND_INTERVAL) {

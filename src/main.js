@@ -13,10 +13,7 @@ experience.start();
 // Mount the Svelte Overlay UI to the #app div,
 // and pass it the sendEmoji function from the experience.
 const overlay = new Overlay({
-  target: document.getElementById('app'),
-  props: {
-    onEmoji: experience.sendEmoji
-  }
+  target: document.getElementById('app')
 });
 
 export default { experience, overlay };
