@@ -93,13 +93,7 @@
 <div class="hud" class:touch-mode={isTouch}>
   <div class="hud-corner" bind:this={cornerEl}>
     <span class="eyebrow">a quiet clearing</span>
-    <p class="hint">
-      {#if isTouch}
-        Joystick to move · RUN / JUMP buttons · drag to look around
-      {:else}
-        WASD to move · shift to run · space to jump · drag to look around
-      {/if}
-    </p>
+
   </div>
 
   <div class="bubble-layer" bind:this={bubbleLayerEl}></div>

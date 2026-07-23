@@ -32,6 +32,7 @@
             border-radius: 8px;
             color: #ddd;
             flex-direction: column;
+            z-index: 50;
         }
         #code-overlay textarea {
             flex: 1;
@@ -57,13 +58,16 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(30, 30, 30, 0.8);
+            background: rgba(30, 30, 30, 0.85);
             padding: 15px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
             gap: 10px;
             pointer-events: auto;
+            max-height: 90vh;
+            overflow-y: auto;
+            width: 190px;
         }
         .asset-btn {
             background: #333;
@@ -78,10 +82,107 @@
         .asset-btn:hover {
             background: #444;
         }
+        .section-title {
+            color: #aaa;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 4px 0 -2px 0;
+        }
+        .tool-row {
+            display: flex;
+            gap: 6px;
+        }
+        .tool-btn {
+            flex: 1;
+            background: #333;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 8px 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .tool-btn:hover:not(:disabled) { background: #444; }
+        .tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .tool-btn .key-hint { font-size: 9px; color: #999; }
+        .tool-btn.danger:hover:not(:disabled) { background: #6b1f1c; }
+        #collision-caption {
+            color: #888;
+            font-size: 11px;
+            font-style: italic;
+            margin: -6px 0 0 24px;
+        }
+
+        /* Floating shortcuts help */
+        #shortcuts-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(30,30,30,0.85);
+            color: #fff;
+            border: 1px solid #555;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #shortcuts-btn:hover { background: #444; }
+        #shortcuts-panel {
+            display: none;
+            position: absolute;
+            bottom: 65px;
+            right: 20px;
+            width: 250px;
+            background: rgba(30, 30, 30, 0.95);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 14px;
+            color: #ddd;
+            font-size: 13px;
+        }
+        #shortcuts-panel h4 { margin: 0 0 8px 0; color: #fff; font-size: 13px; }
+        #shortcuts-panel .row { display: flex; justify-content: space-between; padding: 3px 0; }
+        #shortcuts-panel kbd {
+            background: #111;
+            border: 1px solid #555;
+            border-radius: 3px;
+            padding: 1px 6px;
+            font-family: monospace;
+            color: #4caf50;
+        }
+        #shortcuts-panel .divider { border-top: 1px solid #444; margin: 6px 0; }
+
+        /* Toast */
+        #toast {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20,20,20,0.9);
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* Ghost / placing cursor hint */
+        body.placing-mode canvas { cursor: crosshair; }
     </style>
 </head>
 <body>
     <div id="asset-library">
+        <div class="section-title">Assets</div>
         <button class="asset-btn" draggable="true" data-type="crate">📦 Add Crate</button>
         <button class="asset-btn" draggable="true" data-type="rock">🪨 Add Rock</button>
         <button class="asset-btn" draggable="true" data-type="wall">🧱 Add Wall</button>
@@ -92,14 +193,51 @@
         <button class="asset-btn" draggable="true" data-type="tree">🌲 Add Tree</button>
         <button class="asset-btn" draggable="true" data-type="lamppost">💡 Add Lamppost</button>
         <button class="asset-btn" draggable="true" data-type="bench">🪑 Add Bench</button>
-        <hr style="border-color: #555; margin: 5px 0;">
+
+        <hr style="border-color: #555; margin: 5px 0; width: 100%;">
+        <div class="section-title">Selected Object</div>
+        <div class="tool-row">
+            <button class="tool-btn" id="btn-copy" disabled title="Copy (Ctrl+C)">📋 Copy<span class="key-hint">Ctrl+C</span></button>
+            <button class="tool-btn" id="btn-duplicate" disabled title="Duplicate (Ctrl+D)">🧬 Dup<span class="key-hint">Ctrl+D</span></button>
+        </div>
+        <div class="tool-row">
+            <button class="tool-btn" id="btn-paste" disabled title="Paste (Ctrl+V)">📎 Paste<span class="key-hint">Ctrl+V</span></button>
+            <button class="tool-btn danger" id="btn-delete" disabled title="Delete (Del)">🗑️ Delete<span class="key-hint">Del</span></button>
+        </div>
+
+        <hr style="border-color: #555; margin: 5px 0; width: 100%;">
+        <div class="section-title">View</div>
         <label style="color: white; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-            <input type="checkbox" id="toggle-collisions"> Show Collisions
+            <input type="checkbox" id="toggle-collisions"> Show Collision Boundaries
         </label>
+        <div id="collision-caption">Approximate — mirrors each object's placed mesh bounds</div>
     </div>
 
     <button id="export-btn">Export Code</button>
-    
+    <button id="shortcuts-btn" title="Keyboard shortcuts">?</button>
+
+    <div id="shortcuts-panel">
+        <h4>Keyboard Shortcuts</h4>
+        <div class="row"><span>Move</span><kbd>G</kbd></div>
+        <div class="row"><span>Rotate</span><kbd>R</kbd></div>
+        <div class="row"><span>Scale</span><kbd>S</kbd></div>
+        <div class="divider"></div>
+        <div class="row"><span>Scale up / down</span><kbd>]</kbd> / <kbd>[</kbd></div>
+        <div class="row"><span>Rotate 15°</span><kbd>.</kbd> / <kbd>,</kbd></div>
+        <div class="row"><span>Nudge position</span><kbd>↑ ↓ ← →</kbd></div>
+        <div class="row"><span>Nudge (large step)</span><kbd>Shift</kbd>+arrows</div>
+        <div class="divider"></div>
+        <div class="row"><span>Copy</span><kbd>Ctrl+C</kbd></div>
+        <div class="row"><span>Paste (click to place)</span><kbd>Ctrl+V</kbd></div>
+        <div class="row"><span>Duplicate</span><kbd>Ctrl+D</kbd></div>
+        <div class="row"><span>Delete</span><kbd>Del</kbd></div>
+        <div class="divider"></div>
+        <div class="row"><span>Deselect / Cancel</span><kbd>Esc</kbd></div>
+        <div class="row"><span>Toggle collisions</span><kbd>C</kbd></div>
+    </div>
+
+    <div id="toast"></div>
+
     <div id="code-overlay">
         <button id="close-btn">Close</button>
         <h3>Copy this into world.js (obstacleDefs array)</h3>
@@ -110,7 +248,7 @@
         import { createCore } from './src/lib/engine/core.js';
         import { buildWorld, createObstacle } from './src/lib/engine/world.js';
         import { buildLighting } from './src/lib/engine/lighting.js';
-        
+
         import * as THREE from 'three';
         import GUI from 'https://esm.sh/lil-gui';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -130,22 +268,28 @@
         const { group: environmentGroup } = buildWorld(scene);
 
         // 2.5 COLLISION HELPERS
+        // Approximate boundary visualization: draws the actual mesh bounds
+        // (fill + edge outline) for every obstacle so you can see how it will
+        // block movement in-game. This mirrors placed geometry, so it stays
+        // accurate as you move/rotate/scale objects.
         const collisionHelpers = new THREE.Group();
         collisionHelpers.visible = false;
         scene.add(collisionHelpers);
 
-        document.getElementById('toggle-collisions').addEventListener('change', (e) => {
+        const collisionFillMat = new THREE.MeshBasicMaterial({
+            color: 0xff3b30, transparent: true, opacity: 0.28, depthWrite: false
+        });
+        const collisionEdgeMat = new THREE.LineBasicMaterial({ color: 0xff9500 });
+
+        const toggleCollisionsEl = document.getElementById('toggle-collisions');
+        toggleCollisionsEl.addEventListener('change', (e) => {
             collisionHelpers.visible = e.target.checked;
         });
 
-        let helpersList = [];
-        const mat = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true, transparent: true, opacity: 0.5 });
-        
         function updateCollisionHelpers() {
             if (!collisionHelpers.visible) return;
-            
-            // Clear existing helpers completely to rebuild them
-            // because geometries might change completely (drag and drop)
+
+            // Rebuild every frame since positions/rotations/scales can change live.
             while (collisionHelpers.children.length > 0) {
                 collisionHelpers.remove(collisionHelpers.children[0]);
             }
@@ -155,10 +299,18 @@
 
                 obj.traverse((child) => {
                     if (child.isMesh && child.geometry && child.geometry.type !== 'PlaneGeometry') {
-                        const helper = new THREE.Mesh(child.geometry, mat);
-                        helper.matrixAutoUpdate = false;
-                        helper.matrix.copy(child.matrixWorld);
-                        collisionHelpers.add(helper);
+                        const fill = new THREE.Mesh(child.geometry, collisionFillMat);
+                        fill.matrixAutoUpdate = false;
+                        fill.matrix.copy(child.matrixWorld);
+                        collisionHelpers.add(fill);
+
+                        const edges = new THREE.LineSegments(
+                            new THREE.EdgesGeometry(child.geometry),
+                            collisionEdgeMat
+                        );
+                        edges.matrixAutoUpdate = false;
+                        edges.matrix.copy(child.matrixWorld);
+                        collisionHelpers.add(edges);
                     }
                 });
             });
@@ -178,35 +330,285 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         let selectedMesh = null;
+        let placingMesh = null;   // object currently following the cursor, awaiting placement click
+        let clipboard = null;     // { def, rotY, scale:[x,y,z], pos:[x,y,z] }
+        let lastMouseClient = null;
 
         const gui = new GUI();
         const editorParams = {
             transformMode: 'translate',
-            deselect: () => {
-                transformControl.detach();
-                selectedMesh = null;
-                gui.hide();
-            },
-            delete: () => {
-                if (selectedMesh) {
-                    environmentGroup.remove(selectedMesh);
-                    transformControl.detach();
-                    selectedMesh = null;
-                    gui.hide();
-                }
-            }
+            deselect: () => deselect(),
+            delete: () => deleteSelected()
         };
 
-        const modeController = gui.add(editorParams, 'transformMode', ['translate', 'rotate', 'scale']).name('Mode').onChange(v => transformControl.setMode(v));
-        gui.add(editorParams, 'deselect').name('Deselect');
-        gui.add(editorParams, 'delete').name('🗑️ Delete Object');
-        
+        const modeController = gui.add(editorParams, 'transformMode', ['translate', 'rotate', 'scale'])
+            .name('Mode (G/R/S)')
+            .onChange(v => transformControl.setMode(v));
+        gui.add(editorParams, 'deselect').name('Deselect (Esc)');
+        gui.add(editorParams, 'delete').name('🗑️ Delete (Del)');
+
+        // Precision numeric fields — live-bound to the selected mesh, so you
+        // can dial in exact values instead of dragging the gizmo by hand.
+        const transformParams = {
+            get posX() { return selectedMesh ? selectedMesh.position.x : 0; },
+            set posX(v) { if (selectedMesh) selectedMesh.position.x = v; },
+            get posY() { return selectedMesh ? selectedMesh.position.y : 0; },
+            set posY(v) { if (selectedMesh) selectedMesh.position.y = v; },
+            get posZ() { return selectedMesh ? selectedMesh.position.z : 0; },
+            set posZ(v) { if (selectedMesh) selectedMesh.position.z = v; },
+
+            get rotationX() { return selectedMesh ? THREE.MathUtils.radToDeg(selectedMesh.rotation.x) : 0; },
+            set rotationX(v) { if (selectedMesh) selectedMesh.rotation.x = THREE.MathUtils.degToRad(v); },
+            get rotationY() { return selectedMesh ? THREE.MathUtils.radToDeg(selectedMesh.rotation.y) : 0; },
+            set rotationY(v) { if (selectedMesh) selectedMesh.rotation.y = THREE.MathUtils.degToRad(v); },
+            get rotationZ() { return selectedMesh ? THREE.MathUtils.radToDeg(selectedMesh.rotation.z) : 0; },
+            set rotationZ(v) { if (selectedMesh) selectedMesh.rotation.z = THREE.MathUtils.degToRad(v); },
+
+            get scaleX() { return selectedMesh ? selectedMesh.scale.x : 1; },
+            set scaleX(v) { if (selectedMesh) selectedMesh.scale.x = v; },
+            get scaleY() { return selectedMesh ? selectedMesh.scale.y : 1; },
+            set scaleY(v) { if (selectedMesh) selectedMesh.scale.y = v; },
+            get scaleZ() { return selectedMesh ? selectedMesh.scale.z : 1; },
+            set scaleZ(v) { if (selectedMesh) selectedMesh.scale.z = v; }
+        };
+        const transformFolder = gui.addFolder('Transform');
+        transformFolder.add(transformParams, 'posX', -100, 100, 0.05).name('Pos X').listen();
+        transformFolder.add(transformParams, 'posY', -20, 20, 0.05).name('Pos Y').listen();
+        transformFolder.add(transformParams, 'posZ', -100, 100, 0.05).name('Pos Z').listen();
+        transformFolder.add(transformParams, 'rotationX', 0, 360, 1).name('Rot X °').listen();
+        transformFolder.add(transformParams, 'rotationY', 0, 360, 1).name('Rot Y °').listen();
+        transformFolder.add(transformParams, 'rotationZ', 0, 360, 1).name('Rot Z °').listen();
+        transformFolder.add(transformParams, 'scaleX', 0.1, 10, 0.05).name('Scale X').listen();
+        transformFolder.add(transformParams, 'scaleY', 0.1, 10, 0.05).name('Scale Y').listen();
+        transformFolder.add(transformParams, 'scaleZ', 0.1, 10, 0.05).name('Scale Z').listen();
+
         gui.hide(); // Hide initially
 
-        // Handle delete key
+        // Toolbar buttons in the asset library
+        const btnCopy = document.getElementById('btn-copy');
+        const btnPaste = document.getElementById('btn-paste');
+        const btnDuplicate = document.getElementById('btn-duplicate');
+        const btnDelete = document.getElementById('btn-delete');
+
+        btnCopy.addEventListener('click', copySelected);
+        btnPaste.addEventListener('click', pasteClipboard);
+        btnDuplicate.addEventListener('click', duplicateSelected);
+        btnDelete.addEventListener('click', deleteSelected);
+
+        function refreshToolbar() {
+            btnCopy.disabled = !selectedMesh;
+            btnDuplicate.disabled = !selectedMesh;
+            btnDelete.disabled = !selectedMesh;
+            btnPaste.disabled = !clipboard;
+        }
+        refreshToolbar();
+
+        function selectMesh(mesh) {
+            selectedMesh = mesh;
+            transformControl.attach(mesh);
+            transformControl.setMode(editorParams.transformMode);
+            gui.show();
+            refreshToolbar();
+        }
+
+        function deselect() {
+            transformControl.detach();
+            selectedMesh = null;
+            gui.hide();
+            refreshToolbar();
+        }
+
+        function deleteSelected() {
+            if (!selectedMesh) return;
+            environmentGroup.remove(selectedMesh);
+            transformControl.detach();
+            selectedMesh = null;
+            gui.hide();
+            refreshToolbar();
+            showToast('Deleted');
+        }
+
+        function setMode(mode) {
+            editorParams.transformMode = mode;
+            transformControl.setMode(mode);
+            modeController.updateDisplay();
+        }
+
+        // 4.5 BASELINE HEIGHT LOOKUP (kept in sync with spawn/export logic below)
+        function baseYForType(type, scaleDef) {
+            let sy = 1;
+            if (Array.isArray(scaleDef)) {
+                sy = scaleDef[1];
+            } else if (scaleDef !== undefined) {
+                sy = scaleDef;
+            }
+
+            switch (type) {
+                case 'crate': return 1.1 * sy / 2;
+                case 'wall': return 0.7 * sy;
+                case 'rock': return 0.55 * sy;
+                case 'log': return 0.35 * sy;
+                case 'stump': return 0.3 * sy;
+                case 'barrel': return 0.5 * sy;
+                case 'bush': return 0.5 * sy;
+                case 'haybale': return 0.55 * sy;
+                case 'boulder': return 0.8 * sy;
+                default: return 0; // tree, lamppost, bench, signpost are baseline 0
+            }
+        }
+
+        // 4.6 COPY / PASTE / DUPLICATE
+        function copySelected() {
+            if (!selectedMesh) return;
+            clipboard = {
+                def: JSON.parse(JSON.stringify(selectedMesh.userData.def)),
+                // Full quaternion, not just rotation.y — captures rotation on
+                // any axis (e.g. if the gizmo's X/Z rings were used), so the
+                // pasted copy always matches the exact orientation.
+                quaternion: selectedMesh.quaternion.toArray(),
+                scale: selectedMesh.scale.toArray(),
+                pos: selectedMesh.position.toArray()
+            };
+            refreshToolbar();
+            showToast('Copied — press Ctrl+V or Paste to place');
+        }
+
+        function pasteClipboard() {
+            if (!clipboard) return;
+
+            const def = JSON.parse(JSON.stringify(clipboard.def));
+            const mesh = createObstacle(def);
+            mesh.userData.def = def;
+            mesh.quaternion.fromArray(clipboard.quaternion);
+            mesh.scale.fromArray(clipboard.scale);
+            mesh.position.fromArray(clipboard.pos);
+
+            environmentGroup.add(mesh);
+            deselect();
+
+            // Enter placement mode: the object follows the cursor until the
+            // next click confirms where it goes (Esc cancels).
+            placingMesh = mesh;
+            document.body.classList.add('placing-mode');
+            if (lastMouseClient) updateGhostPosition(lastMouseClient.x, lastMouseClient.y);
+            showToast('Click to place • Esc to cancel');
+        }
+
+        function duplicateSelected() {
+            if (!selectedMesh) return;
+            copySelected();
+            pasteClipboard();
+        }
+
+        function updateGhostPosition(clientX, clientY) {
+            if (!placingMesh) return;
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+            const target = new THREE.Vector3();
+            if (raycaster.ray.intersectPlane(plane, target)) {
+                placingMesh.position.x = target.x;
+                placingMesh.position.z = target.z;
+            }
+        }
+
+        function confirmPlacement() {
+            if (!placingMesh) return;
+            const mesh = placingMesh;
+            placingMesh = null;
+            document.body.classList.remove('placing-mode');
+            selectMesh(mesh);
+            showToast('Placed');
+        }
+
+        function cancelPlacement() {
+            if (!placingMesh) return;
+            environmentGroup.remove(placingMesh);
+            placingMesh = null;
+            document.body.classList.remove('placing-mode');
+        }
+
+        // 4.7 FAST TRANSFORM HELPERS (keyboard nudge / scale-step / rotate-step)
+        function nudgeSelected(dx, dz) {
+            if (!selectedMesh) return;
+            selectedMesh.position.x += dx;
+            selectedMesh.position.z += dz;
+        }
+        function scaleSelected(factor) {
+            if (!selectedMesh) return;
+            selectedMesh.scale.multiplyScalar(factor);
+        }
+        function rotateSelected(radians) {
+            if (!selectedMesh) return;
+            selectedMesh.rotation.y += radians;
+        }
+
+        // 4.8 KEYBOARD SHORTCUTS
         window.addEventListener('keydown', (e) => {
-            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMesh) {
-                editorParams.delete();
+            // Don't hijack typing inside the lil-gui number fields, etc.
+            const tag = e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+            const ctrlOrCmd = e.ctrlKey || e.metaKey;
+            const key = e.key.toLowerCase();
+
+            // Placement mode: only Escape does anything
+            if (placingMesh && key === 'escape') {
+                cancelPlacement();
+                return;
+            }
+
+            if (ctrlOrCmd) {
+                if (key === 'c') { e.preventDefault(); copySelected(); return; }
+                if (key === 'v') { e.preventDefault(); pasteClipboard(); return; }
+                if (key === 'd') { e.preventDefault(); duplicateSelected(); return; }
+                return;
+            }
+
+            switch (key) {
+                case 'g': setMode('translate'); break;
+                case 'r': setMode('rotate'); break;
+                case 's': setMode('scale'); break;
+                case 'delete':
+                case 'backspace':
+                    deleteSelected();
+                    break;
+                case 'escape':
+                    deselect();
+                    break;
+                case 'c':
+                    toggleCollisionsEl.checked = !toggleCollisionsEl.checked;
+                    toggleCollisionsEl.dispatchEvent(new Event('change'));
+                    break;
+                case ']':
+                    scaleSelected(1.1);
+                    break;
+                case '[':
+                    scaleSelected(0.9);
+                    break;
+                case '.':
+                    rotateSelected(THREE.MathUtils.degToRad(15));
+                    break;
+                case ',':
+                    rotateSelected(THREE.MathUtils.degToRad(-15));
+                    break;
+                case 'arrowup':
+                    e.preventDefault();
+                    nudgeSelected(0, e.shiftKey ? -1 : -0.25);
+                    break;
+                case 'arrowdown':
+                    e.preventDefault();
+                    nudgeSelected(0, e.shiftKey ? 1 : 0.25);
+                    break;
+                case 'arrowleft':
+                    e.preventDefault();
+                    nudgeSelected(e.shiftKey ? -1 : -0.25, 0);
+                    break;
+                case 'arrowright':
+                    e.preventDefault();
+                    nudgeSelected(e.shiftKey ? 1 : 0.25, 0);
+                    break;
             }
         });
 
@@ -234,13 +636,13 @@
 
         function spawnAsset(type, useDrop, clientX, clientY) {
             const def = { type, pos: [0, 0, 0] };
-                if (['crate', 'rock', 'log', 'stump', 'barrel', 'bush', 'tree', 'lamppost', 'bench'].includes(type)) def.scale = 1;
-                if (['wall', 'log', 'lamppost', 'bench'].includes(type)) def.rot = 0;
-                if (type === 'wall') def.length = 4;
+            if (['crate', 'rock', 'log', 'stump', 'barrel', 'bush', 'tree', 'lamppost', 'bench'].includes(type)) def.scale = 1;
+            if (['wall', 'log', 'lamppost', 'bench'].includes(type)) def.rot = 0;
+            if (type === 'wall') def.length = 4;
 
             const mesh = createObstacle(def);
             mesh.userData.def = def;
-            
+
             if (useDrop) {
                 mouse.x = (clientX / window.innerWidth) * 2 - 1;
                 mouse.y = -(clientY / window.innerHeight) * 2 + 1;
@@ -256,28 +658,30 @@
                 mesh.position.x = spawnPos.x;
                 mesh.position.z = spawnPos.z;
             }
-            
+
             // Auto-calculate appropriate Y coordinate so it spawns on the floor
-            if (type === 'crate') mesh.position.y = 1.1 / 2;
-            if (type === 'wall') mesh.position.y = 0.7;
-            if (type === 'rock') mesh.position.y = 0.55;
-            if (type === 'log') mesh.position.y = 0.35;
-            if (type === 'stump') mesh.position.y = 0.3;
-            if (type === 'barrel') mesh.position.y = 0.5;
-            if (type === 'bush') mesh.position.y = 0.5;
-            // tree, lamppost, bench are baseline 0
+            mesh.position.y = baseYForType(type, def.scale);
 
             environmentGroup.add(mesh);
-            
+
             // Auto-select
-            selectedMesh = mesh;
-            transformControl.attach(mesh);
-            gui.show();
+            selectMesh(mesh);
         }
+
+        window.addEventListener('mousemove', (e) => {
+            lastMouseClient = { x: e.clientX, y: e.clientY };
+            if (placingMesh) updateGhostPosition(e.clientX, e.clientY);
+        });
 
         window.addEventListener('click', (event) => {
             // Don't raycast if clicking UI
             if (event.target.tagName === 'BUTTON' || event.target.closest('.lil-gui')) return;
+
+            // If we're placing a pasted/duplicated object, this click confirms it.
+            if (placingMesh) {
+                confirmPlacement();
+                return;
+            }
 
             mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -296,46 +700,63 @@
                 }
 
                 if (object && object !== selectedMesh) {
-                    selectedMesh = object;
-                    transformControl.attach(object);
-                    gui.show();
+                    selectMesh(object);
                 }
             }
         });
 
+        // Shortcuts help panel toggle
+        const shortcutsBtn = document.getElementById('shortcuts-btn');
+        const shortcutsPanel = document.getElementById('shortcuts-panel');
+        shortcutsBtn.addEventListener('click', () => {
+            shortcutsPanel.style.display = shortcutsPanel.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Toast helper
+        let toastTimer = null;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.style.opacity = '1';
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 1400);
+        }
+
         // 5. EXPORT LOGIC
         document.getElementById('export-btn').addEventListener('click', () => {
             const obstacles = environmentGroup.children.filter(c => c.userData && c.userData.def);
-            
+
             const defs = obstacles.map(mesh => {
                 const exportDef = { ...mesh.userData.def };
+
+                // Handle rotation
+                const rx = parseFloat(mesh.rotation.x.toFixed(3));
+                const ry = parseFloat(mesh.rotation.y.toFixed(3));
+                const rz = parseFloat(mesh.rotation.z.toFixed(3));
                 
-                // Update rot if applicable
-                if (exportDef.rot !== undefined) {
-                    exportDef.rot = parseFloat(mesh.rotation.y.toFixed(2));
+                if (rx !== 0 || rz !== 0) {
+                    exportDef.rot = [rx, ry, rz];
+                } else if (ry !== 0) {
+                    exportDef.rot = ry;
+                } else {
+                    delete exportDef.rot;
                 }
-                if (exportDef.type === 'wall' && mesh.scale.x !== 1) {
-                    exportDef.length = parseFloat((exportDef.length * mesh.scale.x).toFixed(2));
-                }
+
+                // Handle scale
+                const sx = parseFloat(mesh.scale.x.toFixed(3));
+                const sy = parseFloat(mesh.scale.y.toFixed(3));
+                const sz = parseFloat(mesh.scale.z.toFixed(3));
                 
-                // Update scale for objects that support it
-                if (exportDef.scale !== undefined) {
-                    const scaleFactor = Math.max(mesh.scale.x, mesh.scale.y, mesh.scale.z);
-                    if (scaleFactor !== 1) {
-                        exportDef.scale = parseFloat((exportDef.scale * scaleFactor).toFixed(2));
-                    }
+                if (sx !== sy || sy !== sz) {
+                    exportDef.scale = [sx, sy, sz];
+                } else if (sx !== 1) {
+                    exportDef.scale = sx;
+                } else {
+                    delete exportDef.scale;
                 }
 
                 // Calculate the Y offset based on the object's type and its NEW scale
-                let baseY = 0;
-                const s = exportDef.scale || 1;
-                if (exportDef.type === 'crate') baseY = 1.1 * s / 2;
-                else if (exportDef.type === 'wall') baseY = 0.7;
-                else if (exportDef.type === 'rock') baseY = 0.55 * s;
-                else if (exportDef.type === 'log') baseY = 0.35 * s;
-                else if (exportDef.type === 'stump') baseY = 0.6 * s / 2;
-                else if (exportDef.type === 'barrel') baseY = 1.0 * s / 2;
-                else if (exportDef.type === 'bush') baseY = 0.5 * s;
+                const baseY = baseYForType(exportDef.type, exportDef.scale);
 
                 // Update pos [X, Y, Z]
                 exportDef.pos = [
@@ -343,15 +764,20 @@
                     parseFloat((mesh.position.y - baseY).toFixed(2)),
                     parseFloat(mesh.position.z.toFixed(2))
                 ];
-                
+
                 return exportDef;
             });
 
             // Format beautifully
             const codeString = `  const obstacleDefs = [\n` + defs.map(d => {
                 let str = `    { type: '${d.type}', pos: [${d.pos.join(', ')}]`;
-                if (d.scale !== undefined) str += `, scale: ${d.scale}`;
-                if (d.rot !== undefined) str += `, rot: ${d.rot}`;
+                
+                if (Array.isArray(d.scale)) str += `, scale: [${d.scale.join(', ')}]`;
+                else if (d.scale !== undefined) str += `, scale: ${d.scale}`;
+
+                if (Array.isArray(d.rot)) str += `, rot: [${d.rot.join(', ')}]`;
+                else if (d.rot !== undefined) str += `, rot: ${d.rot}`;
+
                 if (d.length !== undefined) str += `, length: ${d.length}`;
                 str += ` }`;
                 return str;
