@@ -73,35 +73,35 @@ wss.on('connection', (ws, req) => {
   broadcast(room, ws, encodeJoin(player));
 
   ws.on('message', (data) => {
-    if (!(data instanceof Buffer) || data.length === 0) return;
-    const opcode = data.readUInt8(0);
+    try {
+      if (!(data instanceof Buffer) || data.length === 0) return;
+      const opcode = data.readUInt8(0);
 
-    if (opcode === OPCODE.STATE && data.length >= 17) {
-      // Validate before trusting/rebroadcasting — this is the "validated
-      // upon reception" step from the slide. A client that reports NaN or
-      // wildly out-of-bounds coordinates just gets clamped, not banned;
-      // good enough for a non-competitive space.
-      const x = clamp(safeFloat(data.readFloatLE(1)), -WORLD_BOUNDS.xz, WORLD_BOUNDS.xz);
-      const y = clamp(safeFloat(data.readFloatLE(5)), WORLD_BOUNDS.yMin, WORLD_BOUNDS.yMax);
-      const z = clamp(safeFloat(data.readFloatLE(9)), -WORLD_BOUNDS.xz, WORLD_BOUNDS.xz);
-      const rotY = safeFloat(data.readFloatLE(13));
+      if (opcode === OPCODE.STATE && data.length >= 17) {
+        const x = clamp(safeFloat(data.readFloatLE(1)), -WORLD_BOUNDS.xz, WORLD_BOUNDS.xz);
+        const y = clamp(safeFloat(data.readFloatLE(5)), WORLD_BOUNDS.yMin, WORLD_BOUNDS.yMax);
+        const z = clamp(safeFloat(data.readFloatLE(9)), -WORLD_BOUNDS.xz, WORLD_BOUNDS.xz);
+        const rotY = safeFloat(data.readFloatLE(13));
 
-      player.x = x;
-      player.y = y;
-      player.z = z;
-      player.rotY = rotY;
-      broadcast(room, ws, encodeState(player));
-    } else if (opcode === OPCODE.EMOJI && data.length >= 2) {
-      const emojiIndex = data.readUInt8(1);
-      broadcast(room, ws, encodeEmoji(player.id, emojiIndex));
-    } else if (opcode === OPCODE.CANNON_STATE && data.length >= 9) {
-      const cannonIndex = data.readUInt8(1);
-      const pitch = safeFloat(data.readFloatLE(2));
-      const yaw = safeFloat(data.readFloatLE(6));
-      broadcast(room, ws, encodeCannonState(player.id, cannonIndex, pitch, yaw));
-    } else if (opcode === OPCODE.CANNON_FIRE && data.length >= 2) {
-      const cannonIndex = data.readUInt8(1);
-      broadcast(room, ws, encodeCannonFire(player.id, cannonIndex));
+        player.x = x;
+        player.y = y;
+        player.z = z;
+        player.rotY = rotY;
+        broadcast(room, ws, encodeState(player));
+      } else if (opcode === OPCODE.EMOJI && data.length >= 2) {
+        const emojiIndex = data.readUInt8(1);
+        broadcast(room, ws, encodeEmoji(player.id, emojiIndex));
+      } else if (opcode === OPCODE.CANNON_STATE && data.length >= 10) {
+        const cannonIndex = data.readUInt8(1);
+        const pitch = safeFloat(data.readFloatLE(2));
+        const yaw = safeFloat(data.readFloatLE(6));
+        broadcast(room, ws, encodeCannonState(player.id, cannonIndex, pitch, yaw));
+      } else if (opcode === OPCODE.CANNON_FIRE && data.length >= 2) {
+        const cannonIndex = data.readUInt8(1);
+        broadcast(room, ws, encodeCannonFire(player.id, cannonIndex));
+      }
+    } catch (err) {
+      console.error('Invalid message from client, ignoring:', err);
     }
   });
 
