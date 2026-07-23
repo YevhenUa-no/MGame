@@ -963,4 +963,4 @@ export const OBSTACLE_LIBRARY = [
   { type: 'tower-watch', label: 'tower watch', defaults: { scale: 1, rot: 0 } }
 ];
 
-export { PALETTE, createObstacle, updatables };
+export { PALETTE, createObstacle };
