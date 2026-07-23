@@ -198,6 +198,20 @@ export function spawnCannonball(worldScene, cannonObj) {
               }
            });
            
+           if (p && p.mesh && !p.activeCannon) {
+              const dist = p.mesh.position.distanceTo(ball.position);
+              if (dist < 4.0) {
+                 const dir = new THREE.Vector3().subVectors(p.mesh.position, ball.position);
+                 dir.y = 0;
+                 if (dir.lengthSq() < 0.001) dir.set(0, 0, 1);
+                 dir.normalize();
+                 p.velocity.x += dir.x * 30;
+                 p.velocity.z += dir.z * 30;
+                 p.velocity.y = 15;
+                 p.isGrounded = false;
+              }
+           }
+           
            if (ball.parent) ws.remove(ball);
            ball = null;
         } else {
@@ -298,8 +312,17 @@ export function buildWorld(scene) {
     { type: 'rocks-ramp', pos: [-9.47, 0, -1.1] },
     { type: 'firing-cannon', pos: [-11.92, 0, 3.02], scale: [0.673, 0.67, 0.707] },
     { type: 'structure-platform', pos: [11.81, 0.26, -10.74], scale: [1, 1, 0.991], rot: [0.009, -0.129, 0.301] },
-    { type: 'firing-cannon', pos: [13.84, 2.62, -5.74], rot: [-0.113, -0.836, -0.008] },
-    { type: 'ship-pirate-large', pos: [14.99, 0, -8.93] }
+    { type: 'firing-cannon', pos: [10.37, 2.68, -5.35], scale: [1, 1, 0.922], rot: [-0.228, -0.836, -0.008] },
+    { type: 'ship-pirate-large', pos: [14.56, 0, -8.93] },
+    { type: 'cargo-pile-a', pos: [12.63, 0.22, -5.11], scale: [3.402, 2.051, 2.375] },
+    { type: 'cargo-pile-b', pos: [13.54, 0.92, -6.43] },
+    { type: 'cargo-pile-b', pos: [11.96, 0, -6.62] },
+    { type: 'cannon-ball', pos: [9.98, 0, -8.13] },
+    { type: 'chest', pos: [8.14, 0, -13.08] },
+    { type: 'hole', pos: [6.05, 0, -14.92] },
+    { type: 'palm-detailed-straight', pos: [7.9, 0, -17.31] },
+    { type: 'rocks-a', pos: [12.81, -0.56, -7.67] },
+    { type: 'cargo-pile-a', pos: [10.84, 0.22, -5.1], scale: [3.402, 2.051, 2.375] }
   ];
 
 
