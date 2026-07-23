@@ -209,6 +209,7 @@ export function spawnCannonball(worldScene, cannonObj) {
                  p.velocity.z += dir.z * 30;
                  p.velocity.y = 15;
                  p.isGrounded = false;
+                 p.knockbackTimer = 0.6;
               }
            }
            
@@ -545,7 +546,7 @@ function createObstacle(def) {
         prevJump: false,
         yaw: 0,
         pitch: 0,
-        trajectoryLine: null,
+        landingCircle: null,
         
         update: function(dt, worldScene, arr, idx, player, input, collider, touch, network) {
           if (this.timer > 0) this.timer -= dt;
@@ -561,7 +562,7 @@ function createObstacle(def) {
           const dist = player ? this.mesh.position.distanceTo(player.mesh.position) : 999;
 
           if (!isActive) {
-            if (this.trajectoryLine) this.trajectoryLine.visible = false;
+            if (this.landingCircle) this.landingCircle.visible = false;
             
             if (popup && dist < 3.0) {
                 popup.style.display = 'block';
@@ -616,26 +617,28 @@ function createObstacle(def) {
                }
             }
 
-            if (!this.trajectoryLine) {
-              const trajMat = new THREE.LineBasicMaterial({ color: 0xffaa00, linewidth: 2 });
-              const trajGeo = new THREE.BufferGeometry();
-              this.trajectoryLine = new THREE.Line(trajGeo, trajMat);
-              worldScene.add(this.trajectoryLine);
+            if (!this.landingCircle) {
+              const circleGeo = new THREE.RingGeometry(3.5, 4.0, 32);
+              const circleMat = new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+              this.landingCircle = new THREE.Mesh(circleGeo, circleMat);
+              this.landingCircle.rotation.x = -Math.PI / 2;
+              worldScene.add(this.landingCircle);
             }
-            this.trajectoryLine.visible = true;
+            this.landingCircle.visible = true;
 
-            const points = [];
             const offset = new THREE.Vector3(0, 0.6, 0.6);
             const simPos = offset.clone().applyMatrix4(this.mesh.matrixWorld);
             const simVel = new THREE.Vector3(0, 0.5, 1).applyQuaternion(this.mesh.getWorldQuaternion(new THREE.Quaternion())).normalize().multiplyScalar(15);
 
             for (let i = 0; i < 60; i++) {
-               points.push(simPos.clone());
                simVel.y -= 20 * 0.05;
                simPos.addScaledVector(simVel, 0.05);
-               if (simPos.y < 0) { points.push(simPos.clone()); break; }
+               if (simPos.y < 0) {
+                   simPos.y = 0.05; // slightly above ground
+                   break;
+               }
             }
-            this.trajectoryLine.geometry.setFromPoints(points);
+            this.landingCircle.position.copy(simPos);
 
             if (jumpJustPressed && this.timer <= 0) {
               this.timer = 1.0;

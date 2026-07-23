@@ -468,7 +468,8 @@ export function createPlayer(scene, characterConfig = {}, appearanceConfig = {},
     useKenneyArcher: true, // User requested Archer as default
     archerMixer: null,
     archerActions: {},
-    currentArcherAction: null
+    currentArcherAction: null,
+    knockbackTimer: 0
   };
 
   applyArcherToMesh(mesh, player);
@@ -565,7 +566,13 @@ export function updatePlayer(player, collider, input, cameraYaw, deltaTime) {
   _moveInput.set(input.moveX, 0, input.moveZ);
   const inputMagnitude = Math.min(1, _moveInput.length());
 
-  if (inputMagnitude > 0.01) {
+  if (player.knockbackTimer > 0) {
+    player.knockbackTimer -= deltaTime;
+    // Let the physics do its thing with minimal air-resistance damping
+    const damp = Math.exp(-1.5 * deltaTime);
+    velocity.x *= damp;
+    velocity.z *= damp;
+  } else if (inputMagnitude > 0.01) {
     _moveInput.normalize();
 
     _forward.set(0, 0, -1).applyAxisAngle(_upAxis, cameraYaw);
